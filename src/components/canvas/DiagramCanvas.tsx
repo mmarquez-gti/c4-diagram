@@ -124,7 +124,7 @@ export default function DiagramCanvas() {
   //   • Browser Back pressed:         stack is ahead → call goBack()
   //   • history.back() we triggered:  stack already matches → no-op
   // ---------------------------------------------------------------------------
-  const prevNavLenRef = useRef<number>(0);
+  const prevNavLenRef = useRef<number | null>(null);
 
   useEffect(() => {
     const handlePopstate = (e: PopStateEvent) => {
@@ -137,14 +137,15 @@ export default function DiagramCanvas() {
     };
     window.addEventListener('popstate', handlePopstate);
     // Stamp the root state so a back-press from depth > 1 stays on-page
-    window.history.replaceState({ navDepth: $navigationStack.get().length }, '');
-    prevNavLenRef.current = $navigationStack.get().length;
+    const initialLen = $navigationStack.get().length;
+    window.history.replaceState({ navDepth: initialLen }, '');
+    prevNavLenRef.current = initialLen;
     return () => window.removeEventListener('popstate', handlePopstate);
   }, []);
 
   useEffect(() => {
     const len = navigationStack.length;
-    if (prevNavLenRef.current === 0) {
+    if (prevNavLenRef.current === null) {
       prevNavLenRef.current = len;
       return;
     }
