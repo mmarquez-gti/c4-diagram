@@ -212,28 +212,30 @@ export function goBack(): void {
  */
 function findPathToDiagram(project: C4Project, targetId: string): string[] | null {
   const visited = new Set<string>();
-  function dfs(diagId: string): string[] | null {
-    if (visited.has(diagId)) return null;
+  const reversePath: string[] = [];
+  function dfs(diagId: string): boolean {
+    if (visited.has(diagId)) return false;
     visited.add(diagId);
-    if (diagId === targetId) return [diagId];
+    reversePath.push(diagId);
+    if (diagId === targetId) return true;
     const diag = project.diagrams[diagId];
-    if (!diag) return null;
-    for (const node of diag.nodes) {
-      if (node.childDiagramId) {
-        const path = dfs(node.childDiagramId);
-        if (path) return [diagId, ...path];
+    if (diag) {
+      for (const node of diag.nodes) {
+        if (node.childDiagramId && dfs(node.childDiagramId)) return true;
       }
     }
-    return null;
+    reversePath.pop();
+    return false;
   }
-  return dfs(project.rootDiagramId);
+  return dfs(project.rootDiagramId) ? reversePath : null;
 }
 
 /** Jump directly to any diagram in the project by ID, rebuilding the navigation breadcrumb. */
 export function jumpToDiagram(diagramId: string): void {
   const project = $project.get();
   if (!project || !project.diagrams[diagramId]) return;
-  const path = findPathToDiagram(project, diagramId) ?? [diagramId];
+  const path = findPathToDiagram(project, diagramId);
+  if (!path) return;
   clearSelection();
   $navigationStack.set(path);
   $activeDiagramId.set(diagramId);
