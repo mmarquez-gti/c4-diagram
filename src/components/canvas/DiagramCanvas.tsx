@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useStore } from '@nanostores/react';
 import {
   ReactFlow,
@@ -22,15 +22,25 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
-import { $project, $activeDiagramId, getActiveDiagram } from '../../stores/diagramStore';
 import {
+  $project,
+  $activeDiagramId,
+  $navigationStack,
+  getActiveDiagram,
   updateNodePosition,
   addEdge as storeAddEdge,
   removeNode,
   removeEdge,
+  goBack,
 } from '../../stores/diagramStore';
 import { $selectedNodeId, $selectedEdgeId, selectNode, selectEdge, clearSelection } from '../../stores/selectionStore';
 import type { C4Node as C4NodeData, C4Edge as C4EdgeData } from '../../lib/c4/types';
+import C4FlowNode from './C4FlowNode';
+
+// ---------------------------------------------------------------------------
+// Custom node types — defined outside component to avoid ReactFlow remounting
+// ---------------------------------------------------------------------------
+const nodeTypes = { c4node: C4FlowNode };
 
 // ---------------------------------------------------------------------------
 // Node type colour map
@@ -55,22 +65,12 @@ function toFlowNode(n: C4NodeData, selectedId: string | null): Node {
     id: n.id,
     position: n.position,
     data: {
-      label: (
-        <div style={{ padding: '6px 10px', textAlign: 'center' }}>
-          <div style={{ fontSize: '9px', opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            {n.type}
-          </div>
-          <div style={{ fontWeight: 600, fontSize: '13px' }}>{n.label}</div>
-          {n.description && (
-            <div style={{ fontSize: '10px', opacity: 0.75, marginTop: 2 }}>{n.description}</div>
-          )}
-          {n.technology && (
-            <div style={{ fontSize: '9px', opacity: 0.6, fontStyle: 'italic', marginTop: 1 }}>
-              [{n.technology}]
-            </div>
-          )}
-        </div>
-      ),
+      nodeType: n.type,
+      label: n.label,
+      description: n.description,
+      technology: n.technology,
+      childDiagramId: n.childDiagramId,
+      color,
     },
     style: {
       background: color,
@@ -80,8 +80,9 @@ function toFlowNode(n: C4NodeData, selectedId: string | null): Node {
       minWidth: n.size.width,
       minHeight: n.size.height,
       cursor: 'pointer',
+      padding: 0,
     },
-    type: 'default',
+    type: 'c4node',
   };
 }
 
@@ -110,8 +111,39 @@ export default function DiagramCanvas() {
   const activeDiagramId = useStore($activeDiagramId);
   const selectedNodeId = useStore($selectedNodeId);
   const selectedEdgeId = useStore($selectedEdgeId);
+  const navigationStack = useStore($navigationStack);
 
   const diagram = getActiveDiagram();
+
+  // ---------------------------------------------------------------------------
+  // Browser back-button support
+  // Keep browser history in sync with the diagram navigation stack so that
+  // pressing the browser Back button navigates to the parent diagram.
+  // ---------------------------------------------------------------------------
+  const prevNavLenRef = useRef<number>(navigationStack.length);
+  const handlingPopstateRef = useRef(false);
+
+  useEffect(() => {
+    const handlePopstate = () => {
+      handlingPopstateRef.current = true;
+      goBack();
+    };
+    window.addEventListener('popstate', handlePopstate);
+    // Stamp the root state so a back-press from depth>1 lands here, not off-page
+    window.history.replaceState({ navDepth: navigationStack.length }, '');
+    return () => window.removeEventListener('popstate', handlePopstate);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const len = navigationStack.length;
+    if (!handlingPopstateRef.current && len > prevNavLenRef.current) {
+      // Navigated deeper via drill-down — push a new browser history entry
+      window.history.pushState({ navDepth: len }, '');
+    }
+    handlingPopstateRef.current = false;
+    prevNavLenRef.current = len;
+  }, [navigationStack]);
 
   const initialNodes = useMemo(
     () => (diagram?.nodes ?? []).map((n) => toFlowNode(n, selectedNodeId)),
@@ -269,13 +301,14 @@ export default function DiagramCanvas() {
         onNodeClick={handleNodeClick}
         onEdgeClick={handleEdgeClick}
         onPaneClick={handlePaneClick}
+        nodeTypes={nodeTypes}
         fitView
         deleteKeyCode="Delete"
         colorMode="dark"
       >
         <Background variant={BackgroundVariant.Dots} gap={24} color="#374151" />
         <Controls />
-        <MiniMap nodeColor={(n) => (NODE_COLORS[(n.data as { type?: string })?.type ?? ''] ?? '#374151')} />
+        <MiniMap nodeColor={(n) => (NODE_COLORS[(n.data as { nodeType?: string })?.nodeType ?? ''] ?? '#374151')} />
       </ReactFlow>
     </div>
   );
