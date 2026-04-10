@@ -3,26 +3,28 @@ import AppLayout from '../layouts/AppLayout.astro';
 import DiagramCanvas from '../components/canvas/DiagramCanvas';
 import DiagramsPanel from '../components/panels/DiagramsPanel';
 import PropertiesPanel from '../components/panels/PropertiesPanel';
-import Toolbar from '../components/panels/Toolbar';
+import EditorHeader from '../components/editor/EditorHeader';
+import ShapePalette from '../components/editor/ShapePalette';
 ---
 
 <AppLayout title="Editor — C4 Diagram Creator">
-  <!-- Toolbar (React island for interactive state) -->
-  <Toolbar client:load />
+  <!-- Top menubar -->
+  <EditorHeader client:load />
 
   <!-- Main workspace -->
   <div class="flex flex-1 overflow-hidden">
-    <!-- Left panel: Diagrams tree -->
+    <!-- Shape palette (hover to expand) -->
+    <ShapePalette client:load />
+
+    <!-- Left panel: Diagrams tree (collapsible) -->
     <DiagramsPanel client:load />
 
-    <!-- Canvas area (React island) -->
-    <main class="flex-1 overflow-hidden">
+    <!-- Canvas area -->
+    <main class="flex-1 overflow-hidden relative">
       <DiagramCanvas client:load />
     </main>
 
-    <!-- Right panel: Properties (React island) -->
-    <aside class="w-64 bg-gray-900 border-l border-gray-700 flex flex-col p-3 gap-2 shrink-0 overflow-y-auto">
-      <PropertiesPanel client:load />
-    </aside>
+    <!-- Right panel: Properties (collapsible) -->
+    <PropertiesPanel client:load />
   </div>
 </AppLayout>
