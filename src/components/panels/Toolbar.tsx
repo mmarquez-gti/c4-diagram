@@ -1,10 +1,12 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useStore } from '@nanostores/react';
 import {
   $project,
   $activeDiagramId,
   $navigationStack,
+  $checkpointSaved,
   createProject,
   loadProject,
   addNode,
@@ -41,6 +43,14 @@ export default function Toolbar() {
   const activeDiagramId = useStore($activeDiagramId);
   const navigationStack = useStore($navigationStack);
   const history = useStore($history);
+  const checkpointSaved = useStore($checkpointSaved);
+
+  // Auto-clear the checkpoint indicator after 1.5 s
+  useEffect(() => {
+    if (!checkpointSaved) return;
+    const timer = setTimeout(() => $checkpointSaved.set(false), 1500);
+    return () => clearTimeout(timer);
+  }, [checkpointSaved]);
 
   const canUndo = history.past.length > 0;
   const canGoBack = navigationStack.length > 1;
@@ -206,6 +216,13 @@ export default function Toolbar() {
       {diagram && (
         <span className="text-xs text-gray-500 ml-2 shrink-0">
           {diagram.title}
+        </span>
+      )}
+
+      {/* Ctrl+S checkpoint saved indicator */}
+      {checkpointSaved && (
+        <span className="text-xs text-green-400 ml-2 shrink-0 transition-opacity">
+          ✓ Checkpoint saved
         </span>
       )}
     </header>
