@@ -422,7 +422,7 @@ export default function DiagramCanvas() {
   }
 
   return (
-    <div style={{ width: '100%', height: '100%' }}>
+    <div id="diagram-canvas-container" style={{ width: '100%', height: '100%' }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}

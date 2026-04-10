@@ -16,6 +16,7 @@ import {
 import { $history } from '../../stores/historyStore';
 import { $leftPanelOpen, $rightPanelOpen } from '../../stores/uiStore';
 import { serializeProject } from '../../lib/mermaid/serializer';
+import { exportCurrentLayerToPng, exportProjectToPdf } from '../../lib/exportUtils';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -159,6 +160,26 @@ export default function EditorHeader() {
     input.click();
   };
 
+  const handleExportPng = async () => {
+    if (!project || !activeDiagramId) return;
+    const diagram = project.diagrams[activeDiagramId];
+    const name = diagram?.title ?? project.name;
+    try {
+      await exportCurrentLayerToPng(name);
+    } catch {
+      alert('Failed to export PNG. Please try again.');
+    }
+  };
+
+  const handleExportPdf = () => {
+    if (!project) return;
+    try {
+      exportProjectToPdf(project, project.name);
+    } catch {
+      alert('Failed to export PDF. Please try again.');
+    }
+  };
+
   const handleExportMermaid = () => {
     if (!project) return;
     const mmd = serializeProject(project.diagrams, project.rootDiagramId);
@@ -173,6 +194,9 @@ export default function EditorHeader() {
   const fileMenu: MenuEntry[] = [
     { label: 'New project…', shortcut: shortcut('N'), onClick: handleNewProject },
     { label: 'Import .c4m…', onClick: handleImport },
+    { separator: true },
+    { label: 'Export current layer as PNG', onClick: handleExportPng, disabled: !project || !activeDiagramId },
+    { label: 'Export all as interactive PDF', onClick: handleExportPdf, disabled: !project },
     { separator: true },
     { label: 'Export as Mermaid', onClick: handleExportMermaid, disabled: !project },
     { label: 'Export as .c4m', onClick: handleExportJson, disabled: !project },
