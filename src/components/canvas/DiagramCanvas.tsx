@@ -27,19 +27,15 @@ import '@xyflow/react/dist/style.css';
 import {
   $project,
   $activeDiagramId,
-  $navigationStack,
-  $checkpointSaved,
   getActiveDiagram,
   updateNodePosition,
   addEdge as storeAddEdge,
   updateEdge as storeUpdateEdge,
   removeNode,
   removeEdge,
-  restoreState,
 } from '../../stores/diagramStore';
 import { $selectedNodeId, $selectedEdgeId, selectNode, selectEdge, clearSelection } from '../../stores/selectionStore';
 import type { C4Node as C4NodeData, C4Edge as C4EdgeData } from '../../lib/c4/types';
-import { getStateFromUrl, pushStateToUrl, replaceStateInUrl } from '../../lib/urlState';
 import C4FlowNode from './C4FlowNode';
 
 // ---------------------------------------------------------------------------
@@ -120,102 +116,11 @@ export default function DiagramCanvas() {
   const activeDiagramId = useStore($activeDiagramId);
   const selectedNodeId = useStore($selectedNodeId);
   const selectedEdgeId = useStore($selectedEdgeId);
-  const navigationStack = useStore($navigationStack);
 
   const diagram = getActiveDiagram();
 
-  // ---------------------------------------------------------------------------
-  // URL-state browser history
-  // Each sub-diagram drill-down pushes a new URL hash entry so the browser Back
-  // button navigates to the parent diagram. Pressing Ctrl+S (or Cmd+S) pushes a
-  // named checkpoint so the user can jump back to a specific project state at any
-  // time. The full project + navigation stack is encoded as base64url in the hash
-  // — no server round-trip, no file write needed; the hash is recomputed live.
-  // ---------------------------------------------------------------------------
-  const prevNavLenRef = useRef<number | null>(null);
   const reconnectingRef = useRef(false);
   const [reconnectingEdgeId, setReconnectingEdgeId] = useState<string | null>(null);
-  /** Prevents the nav-stack effect from re-encoding state that was just decoded
-   *  from a popstate event (would cause an extra redundant pushState). */
-  const skipNextNavSyncRef = useRef(false);
-
-  // On mount: restore state from URL hash if present; wire up popstate + Ctrl+S.
-  useEffect(() => {
-    const initial = getStateFromUrl();
-    if (initial) {
-      skipNextNavSyncRef.current = true;
-      restoreState(initial.project, initial.navigationStack);
-      prevNavLenRef.current = initial.navigationStack.length;
-      // Normalise the URL entry (re-encodes to ensure canonical form + stateHash)
-      replaceStateInUrl(initial);
-    }
-
-    const handlePopstate = () => {
-      const state = getStateFromUrl();
-      if (!state) {
-        console.warn('[C4] popstate: no decodable state in URL hash — navigation ignored.');
-        return;
-      }
-      skipNextNavSyncRef.current = true;
-      restoreState(state.project, state.navigationStack);
-    };
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-        e.preventDefault();
-        const proj = $project.get();
-        const navStack = $navigationStack.get();
-        if (proj) {
-          pushStateToUrl({ project: proj, navigationStack: navStack });
-          $checkpointSaved.set(true);
-        }
-      }
-    };
-
-    window.addEventListener('popstate', handlePopstate);
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('popstate', handlePopstate);
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, []);
-
-  // Keep the URL hash in sync with diagram navigation.
-  useEffect(() => {
-    const len = navigationStack.length;
-
-    // Skip when this update was triggered by a popstate restoration to avoid
-    // immediately overwriting the URL we just decoded.
-    if (skipNextNavSyncRef.current) {
-      skipNextNavSyncRef.current = false;
-      prevNavLenRef.current = len;
-      return;
-    }
-
-    if (prevNavLenRef.current === null) {
-      prevNavLenRef.current = len;
-      return;
-    }
-
-    const proj = $project.get();
-    if (!proj) {
-      prevNavLenRef.current = len;
-      return;
-    }
-
-    if (len > prevNavLenRef.current) {
-      // Drilled into a sub-diagram → push a new browser history entry so that
-      // the browser Back button can return to the parent diagram.
-      pushStateToUrl({ project: proj, navigationStack });
-    } else if (len < prevNavLenRef.current) {
-      // Navigated back via toolbar or breadcrumb → replace current URL entry
-      // (no extra history entry; the user's intent was already captured by the
-      // previous pushState when they entered the sub-diagram).
-      replaceStateInUrl({ project: proj, navigationStack });
-    }
-
-    prevNavLenRef.current = len;
-  }, [navigationStack]);
 
   const initialNodes = useMemo(
     () => (diagram?.nodes ?? []).map((n) => toFlowNode(n, selectedNodeId)),
