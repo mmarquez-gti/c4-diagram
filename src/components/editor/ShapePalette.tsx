@@ -109,6 +109,15 @@ const SHAPES: ShapeDef[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Initial placement constants for newly added nodes
+// ---------------------------------------------------------------------------
+
+const NODE_PLACE_MIN_X = 120;
+const NODE_PLACE_MAX_X_OFFSET = 300;
+const NODE_PLACE_MIN_Y = 80;
+const NODE_PLACE_MAX_Y_OFFSET = 200;
+
+// ---------------------------------------------------------------------------
 // ShapePalette component
 // ---------------------------------------------------------------------------
 
@@ -120,7 +129,7 @@ export default function ShapePalette() {
     if (!project) {
       createProject();
     }
-    addNode({ type, label: type, x: 120 + Math.random() * 300, y: 80 + Math.random() * 200 });
+    addNode({ type, label: type, x: NODE_PLACE_MIN_X + Math.random() * NODE_PLACE_MAX_X_OFFSET, y: NODE_PLACE_MIN_Y + Math.random() * NODE_PLACE_MAX_Y_OFFSET });
   };
 
   return (

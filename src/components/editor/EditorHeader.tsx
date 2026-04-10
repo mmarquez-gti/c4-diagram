@@ -32,8 +32,16 @@ function downloadFile(name: string, content: string, mime: string): void {
 }
 
 // ---------------------------------------------------------------------------
-// Dropdown menu component
+// Platform-aware shortcut helper
 // ---------------------------------------------------------------------------
+
+function isMac(): boolean {
+  return typeof navigator !== 'undefined' && /mac/i.test(navigator.platform);
+}
+
+function shortcut(key: string): string {
+  return `${isMac() ? '⌘' : 'Ctrl+'}${key}`;
+}
 
 interface MenuItem {
   label: string;
@@ -163,7 +171,7 @@ export default function EditorHeader() {
   };
 
   const fileMenu: MenuEntry[] = [
-    { label: 'New project…', shortcut: 'Ctrl+N', onClick: handleNewProject },
+    { label: 'New project…', shortcut: shortcut('N'), onClick: handleNewProject },
     { label: 'Import .c4m…', onClick: handleImport },
     { separator: true },
     { label: 'Export as Mermaid', onClick: handleExportMermaid, disabled: !project },
@@ -171,8 +179,8 @@ export default function EditorHeader() {
   ];
 
   const editMenu: MenuEntry[] = [
-    { label: 'Undo', shortcut: 'Ctrl+Z', onClick: undo, disabled: !canUndo },
-    { label: 'Redo', shortcut: 'Ctrl+Y', onClick: redo, disabled: !canRedo },
+    { label: 'Undo', shortcut: shortcut('Z'), onClick: undo, disabled: !canUndo },
+    { label: 'Redo', shortcut: shortcut('Y'), onClick: redo, disabled: !canRedo },
   ];
 
   const viewMenu: MenuEntry[] = [
