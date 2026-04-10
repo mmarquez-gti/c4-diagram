@@ -340,18 +340,32 @@ function drawNodeContent(pdf: jsPDF, node: C4Node, r: Rect, scale: number): void
   const { x, y, w, h } = r;
   const cx = x + w / 2;
 
+  // Horizontal padding inside node (mirrors web app's 12px side padding)
+  const sidePad = Math.max(4, 10 * scale);
+  const textWidth = Math.max(20, w - sidePad * 2);
+
   // Boundary: label at top-left (the interior is transparent/large)
   if (node.type === 'Boundary') {
+    const boundaryLabelFontSize = Math.max(7, 9 * scale);
     pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(Math.max(7, 9 * scale));
+    pdf.setFontSize(boundaryLabelFontSize);
     pdf.setTextColor(200, 140, 60);
-    pdf.text(truncate(node.label, 28), x + 8, y + Math.max(12, 14 * scale));
+    const labelLines = pdf.splitTextToSize(node.label, textWidth) as string[];
+    const labelStartY = y + Math.max(12, 14 * scale);
+    labelLines.forEach((line: string, i: number) => {
+      pdf.text(line, x + 8, labelStartY + i * boundaryLabelFontSize * 1.4);
+    });
     if (node.description) {
+      const boundaryDescFontSize = Math.max(6, 7 * scale);
       pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(Math.max(6, 7 * scale));
+      pdf.setFontSize(boundaryDescFontSize);
       pdf.saveGraphicsState();
       pdf.setGState(pdf.GState({ opacity: 0.75 }));
-      pdf.text(truncate(node.description, 36), x + 8, y + Math.max(20, 24 * scale));
+      const descLines = pdf.splitTextToSize(node.description, textWidth) as string[];
+      const descStartY = labelStartY + labelLines.length * boundaryLabelFontSize * 1.4;
+      descLines.forEach((line: string, i: number) => {
+        pdf.text(line, x + 8, descStartY + i * boundaryDescFontSize * 1.4);
+      });
       pdf.restoreGraphicsState();
     }
     return;
@@ -361,18 +375,38 @@ function drawNodeContent(pdf: jsPDF, node: C4Node, r: Rect, scale: number): void
   const paddingTopPx = node.type === 'Container' ? 17 : node.type === 'Person' ? 8 : 6;
   const paddingTop = paddingTopPx * scale;
 
-  // Estimate line heights (jsPDF font sizes are in pt; 1pt ≈ 1pt for layout)
   const iconSize = Math.max(10, Math.min(16 * scale, w * 0.22, (h - paddingTop) * 0.35));
   const typeFontSize = Math.max(5, 7 * scale);
   const nameFontSize = Math.max(6, 9 * scale);
   const descFontSize = Math.max(5, 7 * scale);
   const techFontSize = Math.max(5, 7 * scale);
 
+  // Pre-split text into wrapped lines (font must be set before splitTextToSize
+  // so that jsPDF uses the correct character metrics for line-breaking)
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(nameFontSize);
+  const nameLines = pdf.splitTextToSize(node.label, textWidth) as string[];
+
+  let descLines: string[] = [];
+  if (node.description) {
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(descFontSize);
+    descLines = pdf.splitTextToSize(node.description, textWidth) as string[];
+  }
+
+  let techLines: string[] = [];
+  if (node.technology) {
+    pdf.setFont('helvetica', 'italic');
+    pdf.setFontSize(techFontSize);
+    techLines = pdf.splitTextToSize(`[${node.technology}]`, textWidth) as string[];
+  }
+
+  // Line heights account for the actual number of wrapped lines
   const lineIcon = iconSize + 2 * scale;
   const lineType = typeFontSize * 1.4;
-  const lineName = nameFontSize * 1.4;
-  const lineDesc = node.description ? descFontSize * 1.4 : 0;
-  const lineTech = node.technology ? techFontSize * 1.4 : 0;
+  const lineName = nameFontSize * 1.4 * nameLines.length;
+  const lineDesc = descLines.length > 0 ? descFontSize * 1.4 * descLines.length : 0;
+  const lineTech = techLines.length > 0 ? techFontSize * 1.4 * techLines.length : 0;
 
   const totalH = lineIcon + lineType + lineName + lineDesc + lineTech;
   const availH = h - paddingTop - 4 * scale;
@@ -397,33 +431,39 @@ function drawNodeContent(pdf: jsPDF, node: C4Node, r: Rect, scale: number): void
   pdf.restoreGraphicsState();
   curY += lineType;
 
-  // Name
+  // Name (wrapped)
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(nameFontSize);
   pdf.setTextColor(255, 255, 255);
-  pdf.text(truncate(node.label, 22), cx, curY, { align: 'center' });
+  nameLines.forEach((line: string, i: number) => {
+    pdf.text(line, cx, curY + i * nameFontSize * 1.4, { align: 'center' });
+  });
   curY += lineName;
 
-  // Description
-  if (node.description) {
+  // Description (wrapped)
+  if (descLines.length > 0) {
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(descFontSize);
     pdf.setTextColor(255, 255, 255);
     pdf.saveGraphicsState();
     pdf.setGState(pdf.GState({ opacity: 0.75 }));
-    pdf.text(truncate(node.description, 28), cx, curY, { align: 'center' });
+    descLines.forEach((line: string, i: number) => {
+      pdf.text(line, cx, curY + i * descFontSize * 1.4, { align: 'center' });
+    });
     pdf.restoreGraphicsState();
     curY += lineDesc;
   }
 
-  // Technology
-  if (node.technology) {
+  // Technology (wrapped)
+  if (techLines.length > 0) {
     pdf.setFont('helvetica', 'italic');
     pdf.setFontSize(techFontSize);
     pdf.setTextColor(255, 255, 255);
     pdf.saveGraphicsState();
     pdf.setGState(pdf.GState({ opacity: 0.6 }));
-    pdf.text(`[${truncate(node.technology, 22)}]`, cx, curY, { align: 'center' });
+    techLines.forEach((line: string, i: number) => {
+      pdf.text(line, cx, curY + i * techFontSize * 1.4, { align: 'center' });
+    });
     pdf.restoreGraphicsState();
   }
 }
@@ -726,10 +766,6 @@ function drawDiagramPage(
   }
 
   return nodeRects;
-}
-
-function truncate(text: string, maxLen: number): string {
-  return text.length > maxLen ? text.slice(0, maxLen - 1) + '…' : text;
 }
 
 // ---------------------------------------------------------------------------
