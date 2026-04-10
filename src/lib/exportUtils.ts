@@ -382,7 +382,7 @@ function drawNodeContent(pdf: jsPDF, node: C4Node, r: Rect, scale: number): void
   const techFontSize = Math.max(5, 7 * scale);
 
   // Pre-split text into wrapped lines (font must be set before splitTextToSize
-  // so that jsPDF uses the correct character metrics for line-breaking)
+  // so that jsPDF uses the correct character metrics for line-breaking).
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(nameFontSize);
   const nameLines = pdf.splitTextToSize(node.label, textWidth) as string[];
