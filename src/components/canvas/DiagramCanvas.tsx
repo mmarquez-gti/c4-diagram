@@ -115,12 +115,15 @@ export default function DiagramCanvas() {
 
   const initialNodes = useMemo(
     () => (diagram?.nodes ?? []).map((n) => toFlowNode(n, selectedNodeId)),
+    // Intentionally limited to diagram identity changes only; selection highlight
+    // updates are handled separately via a dedicated useEffect to avoid full remounts.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [activeDiagramId, diagram?.id],
   );
 
   const initialEdges = useMemo(
     () => (diagram?.edges ?? []).map((e) => toFlowEdge(e, selectedEdgeId)),
+    // Same reasoning as initialNodes above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [activeDiagramId, diagram?.id],
   );
@@ -272,7 +275,7 @@ export default function DiagramCanvas() {
       >
         <Background variant={BackgroundVariant.Dots} gap={24} color="#374151" />
         <Controls />
-        <MiniMap nodeColor={(n) => (NODE_COLORS[(n.data as any)?.type] ?? '#374151')} />
+        <MiniMap nodeColor={(n) => (NODE_COLORS[(n.data as { type?: string })?.type ?? ''] ?? '#374151')} />
       </ReactFlow>
     </div>
   );

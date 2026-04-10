@@ -85,7 +85,10 @@ export function addNode(options: CreateNodeOptions = {}): C4Node | null {
   return node;
 }
 
-/** Update a node's position in the active diagram. */
+/** Update a node's position in the active diagram.
+ * Intentionally does NOT snapshot to history — drag events fire continuously
+ * and snapshotting every pixel would flood the undo stack.
+ */
 export function updateNodePosition(nodeId: string, x: number, y: number): void {
   const project = $project.get();
   const diagramId = $activeDiagramId.get();

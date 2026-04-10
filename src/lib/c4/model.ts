@@ -229,6 +229,7 @@ export function createSubdiagram(
 function nextLevel(level: C4Level): C4Level {
   const order: C4Level[] = ['context', 'container', 'component', 'code'];
   const idx = order.indexOf(level);
+  // If already at 'code' or unrecognised, stay at 'component' (lowest non-leaf level)
   return idx >= 0 && idx < order.length - 1 ? order[idx + 1] : 'component';
 }
 
