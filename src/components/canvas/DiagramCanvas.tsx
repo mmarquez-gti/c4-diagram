@@ -88,12 +88,13 @@ function toFlowNode(n: C4NodeData, selectedId: string | null): Node {
       isSelected,
     },
     style: {
-      background: color,
+      background: 'transparent',
       color: '#fff',
-      border: `2px solid ${isSelected ? '#facc15' : 'transparent'}`,
-      borderRadius: 8,
+      border: 'none',
+      borderRadius: 0,
       cursor: 'pointer',
       padding: 0,
+      overflow: 'visible',
     },
     type: 'c4node',
   };
@@ -249,10 +250,6 @@ export default function DiagramCanvas() {
         data: {
           ...n.data,
           isSelected: selectedNodeId === n.id,
-        },
-        style: {
-          ...n.style,
-          border: `2px solid ${selectedNodeId === n.id ? '#facc15' : 'transparent'}`,
         },
       })),
     );
