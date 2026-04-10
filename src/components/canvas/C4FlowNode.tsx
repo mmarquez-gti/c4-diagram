@@ -1,6 +1,6 @@
 'use client';
 
-import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { Handle, Position, NodeResizer, type NodeProps } from '@xyflow/react';
 import { enterSubdiagram } from '../../stores/diagramStore';
 
 export interface C4FlowNodeData extends Record<string, unknown> {
@@ -10,6 +10,7 @@ export interface C4FlowNodeData extends Record<string, unknown> {
   technology?: string;
   childDiagramId?: string;
   color: string;
+  isSelected?: boolean;
 }
 
 const visibleHandleStyle = {
@@ -34,6 +35,13 @@ export default function C4FlowNode({ id, data }: NodeProps) {
 
   return (
     <>
+      <NodeResizer
+        minWidth={100}
+        minHeight={60}
+        isVisible={!!d.isSelected}
+        lineClassName="!border-indigo-400/70"
+        handleClassName="!bg-indigo-400 !border-indigo-200 !rounded-sm"
+      />
       <Handle className="c4-node-handle-visible" type="source" id="source-top" position={Position.Top} style={{ ...visibleHandleStyle, top: 0, transform: 'translate(-50%, -50%)' }} />
       <Handle type="target" id="target-top" position={Position.Top} style={{ ...hiddenHandleStyle, top: 0, transform: 'translate(-50%, -50%)' }} />
 
