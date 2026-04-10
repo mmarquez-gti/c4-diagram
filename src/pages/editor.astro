@@ -1,6 +1,7 @@
 ---
 import AppLayout from '../layouts/AppLayout.astro';
 import DiagramCanvas from '../components/canvas/DiagramCanvas';
+import DiagramsPanel from '../components/panels/DiagramsPanel';
 import PropertiesPanel from '../components/panels/PropertiesPanel';
 import Toolbar from '../components/panels/Toolbar';
 ---
@@ -11,6 +12,9 @@ import Toolbar from '../components/panels/Toolbar';
 
   <!-- Main workspace -->
   <div class="flex flex-1 overflow-hidden">
+    <!-- Left panel: Diagrams tree -->
+    <DiagramsPanel client:load />
+
     <!-- Canvas area (React island) -->
     <main class="flex-1 overflow-hidden">
       <DiagramCanvas client:load />

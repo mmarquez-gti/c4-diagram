@@ -32,11 +32,7 @@ export const $activeDiagramId = atom<string | null>(null);
  */
 export const $navigationStack = atom<string[]>([]);
 
-/**
- * Transient Ctrl+S save indicator. True for a brief moment after a URL
- * checkpoint is pushed; the Toolbar resets it automatically.
- */
-export const $checkpointSaved = atom<boolean>(false);
+
 
 // ---------------------------------------------------------------------------
 // Read helpers
@@ -211,17 +207,36 @@ export function goBack(): void {
 }
 
 /**
- * Restore a full project state and navigation stack from a URL snapshot.
- * Clears undo history and selection because we are jumping to a different
- * point-in-time; the URL itself acts as the history mechanism.
+ * Build the path (list of diagram IDs from root to target) by traversing the
+ * project's diagram tree. Returns null when the diagram cannot be reached.
  */
-export function restoreState(project: C4Project, navigationStack: string[]): void {
-  clearHistory();
+function findPathToDiagram(project: C4Project, targetId: string): string[] | null {
+  const visited = new Set<string>();
+  function dfs(diagId: string): string[] | null {
+    if (visited.has(diagId)) return null;
+    visited.add(diagId);
+    if (diagId === targetId) return [diagId];
+    const diag = project.diagrams[diagId];
+    if (!diag) return null;
+    for (const node of diag.nodes) {
+      if (node.childDiagramId) {
+        const path = dfs(node.childDiagramId);
+        if (path) return [diagId, ...path];
+      }
+    }
+    return null;
+  }
+  return dfs(project.rootDiagramId);
+}
+
+/** Jump directly to any diagram in the project by ID, rebuilding the navigation breadcrumb. */
+export function jumpToDiagram(diagramId: string): void {
+  const project = $project.get();
+  if (!project || !project.diagrams[diagramId]) return;
+  const path = findPathToDiagram(project, diagramId) ?? [diagramId];
   clearSelection();
-  $project.set(project);
-  const activeDiagramId = navigationStack[navigationStack.length - 1] ?? project.rootDiagramId;
-  $activeDiagramId.set(activeDiagramId);
-  $navigationStack.set(navigationStack);
+  $navigationStack.set(path);
+  $activeDiagramId.set(diagramId);
 }
 
 /** Navigate to any diagram in the breadcrumb by index. */
