@@ -58,6 +58,7 @@ export interface CreateEdgeOptions {
   target: string;
   sourceHandle?: string;
   targetHandle?: string;
+  direction?: C4Edge['direction'];
   label?: string;
   technology?: string;
 }
@@ -69,6 +70,7 @@ export function createEdge(options: CreateEdgeOptions): C4Edge {
     target: options.target,
     sourceHandle: options.sourceHandle,
     targetHandle: options.targetHandle,
+    direction: options.direction,
     label: options.label,
     technology: options.technology,
   };

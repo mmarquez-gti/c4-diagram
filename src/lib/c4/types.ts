@@ -28,12 +28,15 @@ export interface C4Node {
   childDiagramId?: string;
 }
 
+export type C4EdgeDirection = 'forward' | 'reverse' | 'bidirectional' | 'none';
+
 export interface C4Edge {
   id: string;
   source: string; // C4Node.id
   target: string; // C4Node.id
   sourceHandle?: string;
   targetHandle?: string;
+  direction?: C4EdgeDirection;
   label?: string;
   technology?: string;
 }

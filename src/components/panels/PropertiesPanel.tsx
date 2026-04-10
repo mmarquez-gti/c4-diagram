@@ -4,7 +4,7 @@ import { useStore } from '@nanostores/react';
 import { $project, $activeDiagramId, updateNode, updateEdge, enterSubdiagram } from '../../stores/diagramStore';
 import { $selectedNodeId, $selectedEdgeId, clearSelection } from '../../stores/selectionStore';
 import { $rightPanelOpen } from '../../stores/uiStore';
-import type { C4NodeType } from '../../lib/c4/types';
+import type { C4EdgeDirection, C4NodeType } from '../../lib/c4/types';
 
 const NODE_TYPES: C4NodeType[] = [
   'Person',
@@ -14,6 +14,13 @@ const NODE_TYPES: C4NodeType[] = [
   'Container',
   'ContainerDb',
   'Component',
+];
+
+const EDGE_DIRECTIONS: Array<{ value: C4EdgeDirection; label: string }> = [
+  { value: 'forward', label: 'Source -> Target' },
+  { value: 'reverse', label: 'Target -> Source' },
+  { value: 'bidirectional', label: 'Bidirectional' },
+  { value: 'none', label: 'No arrows' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -154,8 +161,29 @@ export default function PropertiesPanel() {
           {selectedEdge && !selectedNode && (
             <>
               <p className="text-xs text-[#4a5a72] font-mono truncate">
-                {selectedEdge.source} → {selectedEdge.target}
+                {selectedEdge.source}{' '}
+                {selectedEdge.direction === 'reverse'
+                  ? '←'
+                  : selectedEdge.direction === 'bidirectional'
+                    ? '↔'
+                    : selectedEdge.direction === 'none'
+                      ? '—'
+                      : '→'}{' '}
+                {selectedEdge.target}
               </p>
+
+              <label className="flex flex-col gap-1.5">
+                <span className={labelClass}>Direction</span>
+                <select
+                  className={inputClass}
+                  value={selectedEdge.direction ?? 'forward'}
+                  onChange={(e) => updateEdge(selectedEdge.id, { direction: e.target.value as C4EdgeDirection })}
+                >
+                  {EDGE_DIRECTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
 
               <label className="flex flex-col gap-1.5">
                 <span className={labelClass}>Label</span>

@@ -101,6 +101,24 @@ function toFlowNode(n: C4NodeData, selectedId: string | null): Node {
 
 function toFlowEdge(e: C4EdgeData, selectedId: string | null): Edge {
   const isSelected = selectedId === e.id;
+  const strokeColor = isSelected ? '#facc15' : '#94a3b8';
+  const direction = e.direction ?? 'forward';
+  const marker = { type: 'arrowclosed' as const, color: strokeColor };
+
+  let markerStart: Edge['markerStart'];
+  let markerEnd: Edge['markerEnd'];
+  if (direction === 'reverse') {
+    markerStart = marker;
+  } else if (direction === 'bidirectional') {
+    markerStart = marker;
+    markerEnd = marker;
+  } else if (direction === 'none') {
+    markerStart = undefined;
+    markerEnd = undefined;
+  } else {
+    markerEnd = marker;
+  }
+
   return {
     id: e.id,
     source: e.source,
@@ -109,12 +127,13 @@ function toFlowEdge(e: C4EdgeData, selectedId: string | null): Edge {
     targetHandle: e.targetHandle,
     label: e.label ?? undefined,
     style: {
-      stroke: isSelected ? '#facc15' : '#94a3b8',
+      stroke: strokeColor,
       strokeWidth: 1.5,
     },
     labelStyle: { fill: '#94a3b8', fontSize: 11 },
     labelBgStyle: { fill: '#1e293b' },
-    markerEnd: { type: 'arrowclosed' as const, color: isSelected ? '#facc15' : '#94a3b8' },
+    markerStart,
+    markerEnd,
     reconnectable: isSelected,
   };
 }
@@ -242,18 +261,39 @@ export default function DiagramCanvas() {
 
   useEffect(() => {
     setEdges((eds) =>
-      eds.map((e) => ({
-        ...e,
-        style: {
-          ...e.style,
-          stroke: selectedEdgeId === e.id ? '#facc15' : '#94a3b8',
-        },
-        markerEnd: { type: 'arrowclosed' as const, color: selectedEdgeId === e.id ? '#facc15' : '#94a3b8' },
-        reconnectable: selectedEdgeId === e.id || reconnectingEdgeId === e.id,
-      })),
+      eds.map((e) => {
+        const strokeColor = selectedEdgeId === e.id ? '#facc15' : '#94a3b8';
+        const marker = { type: 'arrowclosed' as const, color: strokeColor };
+        const direction = (diagram?.edges.find((edge) => edge.id === e.id)?.direction) ?? 'forward';
+
+        let markerStart: Edge['markerStart'];
+        let markerEnd: Edge['markerEnd'];
+        if (direction === 'reverse') {
+          markerStart = marker;
+        } else if (direction === 'bidirectional') {
+          markerStart = marker;
+          markerEnd = marker;
+        } else if (direction === 'none') {
+          markerStart = undefined;
+          markerEnd = undefined;
+        } else {
+          markerEnd = marker;
+        }
+
+        return {
+          ...e,
+          style: {
+            ...e.style,
+            stroke: strokeColor,
+          },
+          markerStart,
+          markerEnd,
+          reconnectable: selectedEdgeId === e.id || reconnectingEdgeId === e.id,
+        };
+      }),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reconnectingEdgeId, selectedEdgeId]);
+  }, [diagram, reconnectingEdgeId, selectedEdgeId]);
 
   // Drag — update position in store (no snapshot to avoid cluttering history)
   const handleNodesChange: OnNodesChange = useCallback(
