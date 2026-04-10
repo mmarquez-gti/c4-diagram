@@ -32,6 +32,12 @@ export const $activeDiagramId = atom<string | null>(null);
  */
 export const $navigationStack = atom<string[]>([]);
 
+/**
+ * Transient Ctrl+S save indicator. True for a brief moment after a URL
+ * checkpoint is pushed; the Toolbar resets it automatically.
+ */
+export const $checkpointSaved = atom<boolean>(false);
+
 // ---------------------------------------------------------------------------
 // Read helpers
 // ---------------------------------------------------------------------------
@@ -200,6 +206,20 @@ export function goBack(): void {
   $navigationStack.set(next);
   $activeDiagramId.set(next[next.length - 1]);
   clearSelection();
+}
+
+/**
+ * Restore a full project state and navigation stack from a URL snapshot.
+ * Clears undo history and selection because we are jumping to a different
+ * point-in-time; the URL itself acts as the history mechanism.
+ */
+export function restoreState(project: C4Project, navigationStack: string[]): void {
+  clearHistory();
+  clearSelection();
+  $project.set(project);
+  const activeDiagramId = navigationStack[navigationStack.length - 1] ?? project.rootDiagramId;
+  $activeDiagramId.set(activeDiagramId);
+  $navigationStack.set(navigationStack);
 }
 
 /** Navigate to any diagram in the breadcrumb by index. */
