@@ -66,25 +66,6 @@ function TreeItem({ node, activeDiagramId, indent }: TreeItemProps) {
 }
 
 // ---------------------------------------------------------------------------
-// Toggle button (sits on the right edge of the panel)
-// ---------------------------------------------------------------------------
-
-function ToggleButton({ open, onToggle }: { open: boolean; onToggle: () => void }) {
-  return (
-    <button
-      onClick={onToggle}
-      title={open ? 'Hide diagrams panel' : 'Show diagrams panel'}
-      className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-full w-4 h-8 flex items-center justify-center bg-[#0c0f1a] border border-l-0 border-[#1a2035] text-[#2a3550] hover:text-[#8b9ab0] hover:bg-[#161c2a] transition-colors z-20"
-      style={{ borderRadius: '0 4px 4px 0' }}
-    >
-      <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
-        <path strokeLinecap="round" strokeLinejoin="round" d={open ? 'M15 19l-7-7 7-7' : 'M9 5l7 7-7 7'} />
-      </svg>
-    </button>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Panel component
 // ---------------------------------------------------------------------------
 
@@ -94,26 +75,53 @@ export default function DiagramsPanel() {
   const open = useStore($leftPanelOpen);
 
   return (
-    <div className="relative flex shrink-0">
-      <aside
-        className={`bg-[#0c0f1a] border-r border-[#1a2035] flex flex-col overflow-hidden transition-[width] duration-200 ease-out ${
-          open ? 'w-48' : 'w-0'
-        }`}
-      >
-        <div className="px-3 py-2 text-[11px] font-semibold text-[#3a4a62] uppercase tracking-wider border-b border-[#1a2035] shrink-0 whitespace-nowrap">
-          Diagrams
-        </div>
-
-        {!project ? (
-          <p className="text-xs text-[#2a3a52] p-3 whitespace-nowrap">No project open</p>
+    <div
+      className={`relative flex flex-col shrink-0 bg-[#0c0f1a] border-r border-[#1a2035] overflow-hidden transition-[width] duration-200 ease-out ${
+        open ? 'w-48' : 'w-8'
+      }`}
+    >
+      {/* Header row — always visible */}
+      <div className="flex items-center border-b border-[#1a2035] h-8 shrink-0">
+        {open ? (
+          <>
+            <span className="flex-1 pl-3 text-[11px] font-semibold text-[#3a4a62] uppercase tracking-wider whitespace-nowrap">
+              Diagrams
+            </span>
+            <button
+              onClick={() => $leftPanelOpen.set(false)}
+              title="Collapse diagrams panel"
+              className="w-8 h-full flex items-center justify-center text-[#2a3550] hover:text-[#8b9ab0] hover:bg-[#161c2a] transition-colors shrink-0"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+          </>
         ) : (
-          <div className="flex flex-col gap-0.5 p-1.5 overflow-y-auto flex-1 min-w-0">
-            <TreeItem node={buildTree(project)} activeDiagramId={activeDiagramId} indent={0} />
-          </div>
+          <button
+            onClick={() => $leftPanelOpen.set(true)}
+            title="Expand diagrams panel"
+            className="w-full h-full flex items-center justify-center text-[#2a3550] hover:text-[#8b9ab0] hover:bg-[#161c2a] transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
         )}
-      </aside>
+      </div>
 
-      <ToggleButton open={open} onToggle={() => $leftPanelOpen.set(!open)} />
+      {/* Content — only visible when open */}
+      {open && (
+        <>
+          {!project ? (
+            <p className="text-xs text-[#2a3a52] p-3 whitespace-nowrap">No project open</p>
+          ) : (
+            <div className="flex flex-col gap-0.5 p-1.5 overflow-y-auto flex-1 min-w-0">
+              <TreeItem node={buildTree(project)} activeDiagramId={activeDiagramId} indent={0} />
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

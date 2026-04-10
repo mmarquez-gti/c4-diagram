@@ -31,14 +31,17 @@ import {
   loadProject,
   jumpToDiagram,
   updateNodePosition,
+  updateNodeSize,
   addEdge as storeAddEdge,
   updateEdge as storeUpdateEdge,
   removeNode,
   removeEdge,
+  persistCurrentState,
 } from '../../stores/diagramStore';
 import { $selectedNodeId, $selectedEdgeId, selectNode, selectEdge, clearSelection } from '../../stores/selectionStore';
 import type { C4Node as C4NodeData, C4Edge as C4EdgeData } from '../../lib/c4/types';
 import { getStateFromUrl, replaceStateInUrl } from '../../lib/urlState';
+import { saveToLocalStorage, loadFromLocalStorage } from '../../lib/localState';
 import C4FlowNode from './C4FlowNode';
 
 // ---------------------------------------------------------------------------
@@ -65,9 +68,12 @@ const NODE_COLORS: Record<string, string> = {
 
 function toFlowNode(n: C4NodeData, selectedId: string | null): Node {
   const color = NODE_COLORS[n.type] ?? '#374151';
+  const isSelected = selectedId === n.id;
   return {
     id: n.id,
     position: n.position,
+    width: n.size.width,
+    height: n.size.height,
     data: {
       nodeType: n.type,
       label: n.label,
@@ -75,14 +81,15 @@ function toFlowNode(n: C4NodeData, selectedId: string | null): Node {
       technology: n.technology,
       childDiagramId: n.childDiagramId,
       color,
+      isSelected,
     },
     style: {
       background: color,
       color: '#fff',
-      border: `2px solid ${selectedId === n.id ? '#facc15' : 'transparent'}`,
+      border: `2px solid ${isSelected ? '#facc15' : 'transparent'}`,
       borderRadius: 8,
-      minWidth: n.size.width,
-      minHeight: n.size.height,
+      width: n.size.width,
+      height: n.size.height,
       cursor: 'pointer',
       padding: 0,
     },
@@ -128,16 +135,37 @@ export default function DiagramCanvas() {
 
   useEffect(() => {
     const snapshot = getStateFromUrl();
-    if (!snapshot) return;
-
-    restoringFromUrlRef.current = true;
-    loadProject(snapshot.project);
-
-    if (snapshot.activeDiagramId && snapshot.activeDiagramId !== snapshot.project.rootDiagramId) {
-      jumpToDiagram(snapshot.activeDiagramId);
+    if (snapshot) {
+      restoringFromUrlRef.current = true;
+      loadProject(snapshot.project);
+      if (snapshot.activeDiagramId && snapshot.activeDiagramId !== snapshot.project.rootDiagramId) {
+        jumpToDiagram(snapshot.activeDiagramId);
+      }
+      restoringFromUrlRef.current = false;
+      return;
     }
+    // Fallback: restore from localStorage if no URL state
+    const local = loadFromLocalStorage();
+    if (local) {
+      restoringFromUrlRef.current = true;
+      loadProject(local.project);
+      if (local.activeDiagramId && local.activeDiagramId !== local.project.rootDiagramId) {
+        jumpToDiagram(local.activeDiagramId);
+      }
+      restoringFromUrlRef.current = false;
+    }
+  }, []);
 
-    restoringFromUrlRef.current = false;
+  // Ctrl+S / Cmd+S — explicit save to localStorage
+  useEffect(() => {
+    function handleSave(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        persistCurrentState();
+      }
+    }
+    window.addEventListener('keydown', handleSave);
+    return () => window.removeEventListener('keydown', handleSave);
   }, []);
 
   useEffect(() => {
@@ -197,6 +225,10 @@ export default function DiagramCanvas() {
     setNodes((nds) =>
       nds.map((n) => ({
         ...n,
+        data: {
+          ...n.data,
+          isSelected: selectedNodeId === n.id,
+        },
         style: {
           ...n.style,
           border: `2px solid ${selectedNodeId === n.id ? '#facc15' : 'transparent'}`,
@@ -228,6 +260,9 @@ export default function DiagramCanvas() {
       for (const change of changes) {
         if (change.type === 'position' && !change.dragging && change.position) {
           updateNodePosition(change.id, change.position.x, change.position.y);
+        }
+        if (change.type === 'dimensions' && change.dimensions && !change.resizing) {
+          updateNodeSize(change.id, change.dimensions.width, change.dimensions.height);
         }
       }
     },

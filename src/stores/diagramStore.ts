@@ -15,6 +15,7 @@ import {
 } from '../lib/c4/model';
 import { $history, snapshot, clearHistory } from './historyStore';
 import { clearSelection } from './selectionStore';
+import { saveToLocalStorage } from '../lib/localState';
 
 // ---------------------------------------------------------------------------
 // Atoms
@@ -96,6 +97,16 @@ export function updateNodePosition(nodeId: string, x: number, y: number): void {
   const diagramId = $activeDiagramId.get();
   if (!project || !diagramId) return;
   $project.set(updateNodeInProject(project, diagramId, nodeId, { position: { x, y } }));
+}
+
+/** Update a node's size in the active diagram.
+ * Intentionally does NOT snapshot to history — resize events fire continuously.
+ */
+export function updateNodeSize(nodeId: string, width: number, height: number): void {
+  const project = $project.get();
+  const diagramId = $activeDiagramId.get();
+  if (!project || !diagramId) return;
+  $project.set(updateNodeInProject(project, diagramId, nodeId, { size: { width, height } }));
 }
 
 /** Update arbitrary fields on a node in the active diagram. */
@@ -194,6 +205,8 @@ export function enterSubdiagram(nodeId: string): void {
   clearSelection();
   $activeDiagramId.set(targetDiagramId);
   $navigationStack.set([...$navigationStack.get(), targetDiagramId]);
+  // Auto-save when entering a sub-diagram
+  persistCurrentState();
 }
 
 /** Navigate back to the parent diagram. */
@@ -204,6 +217,8 @@ export function goBack(): void {
   $navigationStack.set(next);
   $activeDiagramId.set(next[next.length - 1]);
   clearSelection();
+  // Auto-save when going back
+  persistCurrentState();
 }
 
 /**
@@ -249,6 +264,20 @@ export function navigateTo(index: number): void {
   $navigationStack.set(next);
   $activeDiagramId.set(next[next.length - 1]);
   clearSelection();
+  // Auto-save when navigating via breadcrumb
+  persistCurrentState();
+}
+
+// ---------------------------------------------------------------------------
+// Persist helper
+// ---------------------------------------------------------------------------
+
+/** Save current project state to localStorage. */
+export function persistCurrentState(): void {
+  const project = $project.get();
+  const activeDiagramId = $activeDiagramId.get();
+  if (!project) return;
+  saveToLocalStorage({ project, activeDiagramId: activeDiagramId ?? undefined });
 }
 
 // ---------------------------------------------------------------------------

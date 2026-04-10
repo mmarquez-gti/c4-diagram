@@ -26,25 +26,6 @@ const inputClass =
 const labelClass = 'text-[11px] font-medium text-[#4a5a72] uppercase tracking-wider';
 
 // ---------------------------------------------------------------------------
-// Toggle button (sits on the left edge of the panel)
-// ---------------------------------------------------------------------------
-
-function ToggleButton({ open, onToggle }: { open: boolean; onToggle: () => void }) {
-  return (
-    <button
-      onClick={onToggle}
-      title={open ? 'Hide properties panel' : 'Show properties panel'}
-      className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-full w-4 h-8 flex items-center justify-center bg-[#0c0f1a] border border-r-0 border-[#1a2035] text-[#2a3550] hover:text-[#8b9ab0] hover:bg-[#161c2a] transition-colors z-20"
-      style={{ borderRadius: '4px 0 0 4px' }}
-    >
-      <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
-        <path strokeLinecap="round" strokeLinejoin="round" d={open ? 'M9 5l7 7-7 7' : 'M15 19l-7-7 7-7'} />
-      </svg>
-    </button>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // PropertiesPanel
 // ---------------------------------------------------------------------------
 
@@ -60,30 +41,54 @@ export default function PropertiesPanel() {
   const selectedEdge = diagram?.edges.find((e) => e.id === selectedEdgeId) ?? null;
 
   return (
-    <div className="relative flex shrink-0">
-      <ToggleButton open={open} onToggle={() => $rightPanelOpen.set(!open)} />
-
-      <aside
-        className={`bg-[#0c0f1a] border-l border-[#1a2035] flex flex-col overflow-hidden transition-[width] duration-200 ease-out ${
-          open ? 'w-64' : 'w-0'
-        }`}
-      >
-        {/* Header */}
-        <div className="px-3 py-2 text-[11px] font-semibold text-[#3a4a62] uppercase tracking-wider border-b border-[#1a2035] shrink-0 flex items-center justify-between whitespace-nowrap">
-          <span>Properties</span>
-          {(selectedNode || selectedEdge) && (
+    <div
+      className={`relative flex flex-col shrink-0 bg-[#0c0f1a] border-l border-[#1a2035] overflow-hidden transition-[width] duration-200 ease-out ${
+        open ? 'w-64' : 'w-8'
+      }`}
+    >
+      {/* Header row — always visible */}
+      <div className="flex items-center border-b border-[#1a2035] h-8 shrink-0">
+        {open ? (
+          <>
             <button
-              onClick={() => clearSelection()}
-              className="text-[#2a3550] hover:text-[#8b9ab0] transition-colors"
-              title="Deselect"
+              onClick={() => $rightPanelOpen.set(false)}
+              title="Collapse properties panel"
+              className="w-8 h-full flex items-center justify-center text-[#2a3550] hover:text-[#8b9ab0] hover:bg-[#161c2a] transition-colors shrink-0"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
               </svg>
             </button>
-          )}
-        </div>
+            <span className="flex-1 text-[11px] font-semibold text-[#3a4a62] uppercase tracking-wider whitespace-nowrap">
+              Properties
+            </span>
+            {(selectedNode || selectedEdge) && (
+              <button
+                onClick={() => clearSelection()}
+                className="mr-2 text-[#2a3550] hover:text-[#8b9ab0] transition-colors"
+                title="Deselect"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </>
+        ) : (
+          <button
+            onClick={() => $rightPanelOpen.set(true)}
+            title="Expand properties panel"
+            className="w-full h-full flex items-center justify-center text-[#2a3550] hover:text-[#8b9ab0] hover:bg-[#161c2a] transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+        )}
+      </div>
 
+      {/* Content — only visible when open */}
+      {open && (
         <div className="flex flex-col gap-4 p-3 overflow-y-auto flex-1 min-w-0">
           {!selectedNode && !selectedEdge && (
             <p className="text-xs text-[#2a3a52] italic mt-2 whitespace-nowrap">
@@ -172,7 +177,7 @@ export default function PropertiesPanel() {
             </>
           )}
         </div>
-      </aside>
+      )}
     </div>
   );
 }
