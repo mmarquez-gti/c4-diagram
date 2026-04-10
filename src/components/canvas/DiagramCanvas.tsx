@@ -28,6 +28,8 @@ import {
   $project,
   $activeDiagramId,
   getActiveDiagram,
+  loadProject,
+  jumpToDiagram,
   updateNodePosition,
   addEdge as storeAddEdge,
   updateEdge as storeUpdateEdge,
@@ -36,6 +38,7 @@ import {
 } from '../../stores/diagramStore';
 import { $selectedNodeId, $selectedEdgeId, selectNode, selectEdge, clearSelection } from '../../stores/selectionStore';
 import type { C4Node as C4NodeData, C4Edge as C4EdgeData } from '../../lib/c4/types';
+import { getStateFromUrl, replaceStateInUrl } from '../../lib/urlState';
 import C4FlowNode from './C4FlowNode';
 
 // ---------------------------------------------------------------------------
@@ -120,7 +123,27 @@ export default function DiagramCanvas() {
   const diagram = getActiveDiagram();
 
   const reconnectingRef = useRef(false);
+  const restoringFromUrlRef = useRef(false);
   const [reconnectingEdgeId, setReconnectingEdgeId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const snapshot = getStateFromUrl();
+    if (!snapshot) return;
+
+    restoringFromUrlRef.current = true;
+    loadProject(snapshot.project);
+
+    if (snapshot.activeDiagramId && snapshot.activeDiagramId !== snapshot.project.rootDiagramId) {
+      jumpToDiagram(snapshot.activeDiagramId);
+    }
+
+    restoringFromUrlRef.current = false;
+  }, []);
+
+  useEffect(() => {
+    if (!project || !activeDiagramId || restoringFromUrlRef.current) return;
+    replaceStateInUrl({ project, activeDiagramId });
+  }, [activeDiagramId, project]);
 
   const initialNodes = useMemo(
     () => (diagram?.nodes ?? []).map((n) => toFlowNode(n, selectedNodeId)),
