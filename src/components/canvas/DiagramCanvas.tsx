@@ -74,6 +74,10 @@ function toFlowNode(n: C4NodeData, selectedId: string | null): Node {
     position: n.position,
     width: n.size.width,
     height: n.size.height,
+    // Setting measured prevents ReactFlow from resetting handleBounds to undefined
+    // on every setNodes call, which would cause edges to disappear until the
+    // ResizeObserver fires again.
+    measured: { width: n.size.width, height: n.size.height },
     data: {
       nodeType: n.type,
       label: n.label,
@@ -88,8 +92,6 @@ function toFlowNode(n: C4NodeData, selectedId: string | null): Node {
       color: '#fff',
       border: `2px solid ${isSelected ? '#facc15' : 'transparent'}`,
       borderRadius: 8,
-      width: n.size.width,
-      height: n.size.height,
       cursor: 'pointer',
       padding: 0,
     },
