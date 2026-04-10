@@ -53,6 +53,8 @@ export async function exportCurrentLayerToPng(filename: string): Promise<void> {
 
 /** Margin (pt) around diagram content on each PDF page */
 const PDF_MARGIN = 32;
+/** Gap (pt) between dots in the background dot grid — matches ReactFlow BackgroundVariant.Dots gap={24} */
+const DOT_GRID_GAP = 24;
 /** A4 dimensions in pt */
 const PAGE_W = 595;
 const PAGE_H = 842;
@@ -262,10 +264,10 @@ function drawNodeShape(pdf: jsPDF, node: C4Node, r: Rect): void {
     const dotY = y + headerH / 2;
     const dotSpacing = dotR * 2.5;
     const dotX0 = x + 5 + dotR;
-    const dotOpacities = [0.55, 0.40, 0.25] as const;
+    const containerHeaderDotOpacities = [0.55, 0.40, 0.25] as const;
     for (let i = 0; i < 3; i++) {
       pdf.saveGraphicsState();
-      pdf.setGState(pdf.GState({ opacity: dotOpacities[i] }));
+      pdf.setGState(pdf.GState({ opacity: containerHeaderDotOpacities[i] }));
       pdf.setFillColor(255, 255, 255);
       pdf.circle(dotX0 + i * dotSpacing, dotY, dotR, 'F');
       pdf.restoreGraphicsState();
@@ -297,7 +299,8 @@ function drawNodeShape(pdf: jsPDF, node: C4Node, r: Rect): void {
     // Rounded top shape: borderRadius '40% 40% 8px 8px' approximated with a custom path
     const topR = Math.min(w * 0.4, h * 0.4);
     const botR = Math.min(4, h * 0.1);
-    const k = 0.5523; // bezier control point ratio for quarter-circle approximation
+    // k = 4*(√2-1)/3 ≈ 0.5523: Bézier control-point ratio that approximates a quarter-circle arc
+    const k = 0.5523;
 
     pdf.setFillColor(cr, cg, cb);
     pdf.setDrawColor(...border);
@@ -578,9 +581,8 @@ function drawDiagramPage(
   pdf.saveGraphicsState();
   pdf.setGState(pdf.GState({ opacity: 0.08 }));
   pdf.setFillColor(107, 114, 128); // gray-500
-  const dotGap = 24;
-  for (let gx = PDF_MARGIN % dotGap; gx < PAGE_W; gx += dotGap) {
-    for (let gy = PDF_MARGIN % dotGap + 28; gy < PAGE_H; gy += dotGap) {
+  for (let gx = PDF_MARGIN % DOT_GRID_GAP; gx < PAGE_W; gx += DOT_GRID_GAP) {
+    for (let gy = PDF_MARGIN % DOT_GRID_GAP + 28; gy < PAGE_H; gy += DOT_GRID_GAP) {
       pdf.circle(gx, gy, 0.8, 'F');
     }
   }
