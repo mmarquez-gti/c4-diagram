@@ -127,6 +127,7 @@ export function removeNode(nodeId: string): void {
   withSnapshot(() => {
     $project.set(removeNodeFromProject(project, diagramId, nodeId));
   });
+  saveToLocalStorage({ project: $project.get()!, activeDiagramId: diagramId });
 }
 
 /** Add a new edge between two nodes in the active diagram. */
@@ -166,6 +167,7 @@ export function removeEdge(edgeId: string): void {
   withSnapshot(() => {
     $project.set(removeEdgeFromProject(project, diagramId, edgeId));
   });
+  saveToLocalStorage({ project: $project.get()!, activeDiagramId: diagramId });
 }
 
 /** Drill into a node's sub-diagram (create one if it doesn't exist). */

@@ -260,6 +260,9 @@ export default function DiagramCanvas() {
     (changes: NodeChange[]) => {
       onNodesChange(changes);
       for (const change of changes) {
+        if (change.type === 'remove') {
+          removeNode(change.id);
+        }
         if (change.type === 'position' && !change.dragging && change.position) {
           updateNodePosition(change.id, change.position.x, change.position.y);
         }
