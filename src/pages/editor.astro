@@ -1,45 +1,24 @@
 ---
 import AppLayout from '../layouts/AppLayout.astro';
 import DiagramCanvas from '../components/canvas/DiagramCanvas';
+import PropertiesPanel from '../components/panels/PropertiesPanel';
+import Toolbar from '../components/panels/Toolbar';
 ---
 
 <AppLayout title="Editor — C4 Diagram Creator">
-  <!-- Top toolbar -->
-  <header class="flex items-center gap-3 bg-gray-900 border-b border-gray-700 px-4 py-2 shrink-0">
-    <span class="font-semibold text-blue-400 tracking-wide">C4 Diagram Creator</span>
-    <div class="flex-1" />
-    <!-- Toolbar placeholder: will be replaced with Toolbar.astro component -->
-    <button
-      class="px-3 py-1 text-sm rounded bg-blue-600 hover:bg-blue-500 transition-colors"
-      disabled
-    >
-      Export
-    </button>
-    <button
-      class="px-3 py-1 text-sm rounded bg-gray-700 hover:bg-gray-600 transition-colors"
-      disabled
-    >
-      Import
-    </button>
-  </header>
+  <!-- Toolbar (React island for interactive state) -->
+  <Toolbar client:load />
 
   <!-- Main workspace -->
   <div class="flex flex-1 overflow-hidden">
-    <!-- Left panel placeholder -->
-    <aside class="w-56 bg-gray-900 border-r border-gray-700 flex flex-col p-3 gap-2 shrink-0">
-      <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Layers</p>
-      <div class="flex-1 text-xs text-gray-500 italic">Layer panel — coming soon</div>
-    </aside>
-
     <!-- Canvas area (React island) -->
     <main class="flex-1 overflow-hidden">
       <DiagramCanvas client:load />
     </main>
 
-    <!-- Right panel placeholder -->
-    <aside class="w-64 bg-gray-900 border-l border-gray-700 flex flex-col p-3 gap-2 shrink-0">
-      <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Properties</p>
-      <div class="flex-1 text-xs text-gray-500 italic">Properties panel — coming soon</div>
+    <!-- Right panel: Properties (React island) -->
+    <aside class="w-64 bg-gray-900 border-l border-gray-700 flex flex-col p-3 gap-2 shrink-0 overflow-y-auto">
+      <PropertiesPanel client:load />
     </aside>
   </div>
 </AppLayout>
