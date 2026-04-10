@@ -126,13 +126,15 @@ export function removeNode(nodeId: string): void {
 export function addEdge(
   source: string,
   target: string,
+  sourceHandle?: string,
+  targetHandle?: string,
   label?: string,
   technology?: string,
 ): C4Edge | null {
   const project = $project.get();
   const diagramId = $activeDiagramId.get();
   if (!project || !diagramId) return null;
-  const edge = createEdge({ source, target, label, technology });
+  const edge = createEdge({ source, target, sourceHandle, targetHandle, label, technology });
   withSnapshot(() => {
     $project.set(addEdgeToProject(project, diagramId, edge));
   });

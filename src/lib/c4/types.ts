@@ -32,6 +32,8 @@ export interface C4Edge {
   id: string;
   source: string; // C4Node.id
   target: string; // C4Node.id
+  sourceHandle?: string;
+  targetHandle?: string;
   label?: string;
   technology?: string;
 }

@@ -56,6 +56,8 @@ export function createNode(options: CreateNodeOptions = {}): C4Node {
 export interface CreateEdgeOptions {
   source: string;
   target: string;
+  sourceHandle?: string;
+  targetHandle?: string;
   label?: string;
   technology?: string;
 }
@@ -65,6 +67,8 @@ export function createEdge(options: CreateEdgeOptions): C4Edge {
     id: generateId('edge'),
     source: options.source,
     target: options.target,
+    sourceHandle: options.sourceHandle,
+    targetHandle: options.targetHandle,
     label: options.label,
     technology: options.technology,
   };

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '@nanostores/react';
 import {
   ReactFlow,
@@ -9,6 +9,7 @@ import {
   Controls,
   MiniMap,
   addEdge,
+  reconnectEdge,
   useNodesState,
   useEdgesState,
   type Connection,
@@ -17,6 +18,7 @@ import {
   type Node,
   type Edge,
   type OnConnect,
+  type OnReconnect,
   type OnNodesChange,
   type OnEdgesChange,
 } from '@xyflow/react';
@@ -30,6 +32,7 @@ import {
   getActiveDiagram,
   updateNodePosition,
   addEdge as storeAddEdge,
+  updateEdge as storeUpdateEdge,
   removeNode,
   removeEdge,
   restoreState,
@@ -89,18 +92,22 @@ function toFlowNode(n: C4NodeData, selectedId: string | null): Node {
 }
 
 function toFlowEdge(e: C4EdgeData, selectedId: string | null): Edge {
+  const isSelected = selectedId === e.id;
   return {
     id: e.id,
     source: e.source,
     target: e.target,
+    sourceHandle: e.sourceHandle,
+    targetHandle: e.targetHandle,
     label: e.label ?? undefined,
     style: {
-      stroke: selectedId === e.id ? '#facc15' : '#94a3b8',
+      stroke: isSelected ? '#facc15' : '#94a3b8',
       strokeWidth: 1.5,
     },
     labelStyle: { fill: '#94a3b8', fontSize: 11 },
     labelBgStyle: { fill: '#1e293b' },
-    markerEnd: { type: 'arrowclosed' as const, color: selectedId === e.id ? '#facc15' : '#94a3b8' },
+    markerEnd: { type: 'arrowclosed' as const, color: isSelected ? '#facc15' : '#94a3b8' },
+    reconnectable: isSelected,
   };
 }
 
@@ -126,6 +133,8 @@ export default function DiagramCanvas() {
   // — no server round-trip, no file write needed; the hash is recomputed live.
   // ---------------------------------------------------------------------------
   const prevNavLenRef = useRef<number | null>(null);
+  const reconnectingRef = useRef(false);
+  const [reconnectingEdgeId, setReconnectingEdgeId] = useState<string | null>(null);
   /** Prevents the nav-stack effect from re-encoding state that was just decoded
    *  from a popstate event (would cause an extra redundant pushState). */
   const skipNextNavSyncRef = useRef(false);
@@ -230,7 +239,11 @@ export default function DiagramCanvas() {
   useEffect(() => {
     const d = getActiveDiagram();
     setNodes((d?.nodes ?? []).map((n) => toFlowNode(n, selectedNodeId)));
-    setEdges((d?.edges ?? []).map((e) => toFlowEdge(e, selectedEdgeId)));
+    setEdges((d?.edges ?? []).map((e) => {
+      const flowEdge = toFlowEdge(e, selectedEdgeId);
+      flowEdge.reconnectable = selectedEdgeId === e.id || reconnectingEdgeId === e.id;
+      return flowEdge;
+    }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeDiagramId]);
 
@@ -243,7 +256,11 @@ export default function DiagramCanvas() {
     }
     const d = getActiveDiagram();
     setNodes((d?.nodes ?? []).map((n) => toFlowNode(n, selectedNodeId)));
-    setEdges((d?.edges ?? []).map((e) => toFlowEdge(e, selectedEdgeId)));
+    setEdges((d?.edges ?? []).map((e) => {
+      const flowEdge = toFlowEdge(e, selectedEdgeId);
+      flowEdge.reconnectable = selectedEdgeId === e.id || reconnectingEdgeId === e.id;
+      return flowEdge;
+    }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project]);
 
@@ -270,10 +287,11 @@ export default function DiagramCanvas() {
           stroke: selectedEdgeId === e.id ? '#facc15' : '#94a3b8',
         },
         markerEnd: { type: 'arrowclosed' as const, color: selectedEdgeId === e.id ? '#facc15' : '#94a3b8' },
+        reconnectable: selectedEdgeId === e.id || reconnectingEdgeId === e.id,
       })),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedEdgeId]);
+  }, [reconnectingEdgeId, selectedEdgeId]);
 
   // Drag — update position in store (no snapshot to avoid cluttering history)
   const handleNodesChange: OnNodesChange = useCallback(
@@ -291,6 +309,13 @@ export default function DiagramCanvas() {
   const handleEdgesChange: OnEdgesChange = useCallback(
     (changes: EdgeChange[]) => {
       onEdgesChange(changes);
+
+      if (reconnectingRef.current) {
+        // React Flow can emit transient edge remove changes while an endpoint
+        // is being dragged; ignore them to avoid flicker/disappearing edges.
+        return;
+      }
+
       for (const change of changes) {
         if (change.type === 'remove') {
           removeEdge(change.id);
@@ -303,16 +328,53 @@ export default function DiagramCanvas() {
   // Connect nodes — create edge in store
   const handleConnect: OnConnect = useCallback(
     (connection: Connection) => {
+      if (selectedEdgeId) return;
+
       setEdges((eds) => addEdge(connection, eds));
       if (connection.source && connection.target) {
-        storeAddEdge(connection.source, connection.target);
+        storeAddEdge(
+          connection.source,
+          connection.target,
+          connection.sourceHandle ?? undefined,
+          connection.targetHandle ?? undefined,
+        );
       }
     },
-    [setEdges],
+    [selectedEdgeId, setEdges],
   );
+
+  const handleReconnect: OnReconnect = useCallback(
+    (oldEdge: Edge, newConnection: Connection) => {
+      if (selectedEdgeId !== oldEdge.id) return;
+
+      setEdges((eds) => reconnectEdge(oldEdge, newConnection, eds));
+
+      if (!newConnection.source || !newConnection.target) {
+        return;
+      }
+
+      storeUpdateEdge(oldEdge.id, {
+        source: newConnection.source,
+        target: newConnection.target,
+        sourceHandle: newConnection.sourceHandle ?? undefined,
+        targetHandle: newConnection.targetHandle ?? undefined,
+      });
+    },
+    [selectedEdgeId, setEdges],
+  );
+
+  const handleReconnectStart = useCallback(() => {
+    reconnectingRef.current = true;
+  }, []);
+
+  const handleReconnectEnd = useCallback(() => {
+    reconnectingRef.current = false;
+    setReconnectingEdgeId(null);
+  }, []);
 
   // Selection
   const handleNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
+    if (reconnectingRef.current) return;
     selectNode(node.id);
   }, []);
 
@@ -321,6 +383,7 @@ export default function DiagramCanvas() {
   }, []);
 
   const handlePaneClick = useCallback(() => {
+    if (reconnectingRef.current) return;
     clearSelection();
   }, []);
 
@@ -361,9 +424,18 @@ export default function DiagramCanvas() {
         onNodesChange={handleNodesChange}
         onEdgesChange={handleEdgesChange}
         onConnect={handleConnect}
+        onReconnect={handleReconnect}
+        onReconnectStart={(_, edge) => {
+          handleReconnectStart();
+          setReconnectingEdgeId(edge.id);
+          selectEdge(edge.id);
+        }}
+        onReconnectEnd={handleReconnectEnd}
         onNodeClick={handleNodeClick}
         onEdgeClick={handleEdgeClick}
         onPaneClick={handlePaneClick}
+        edgesReconnectable
+        nodesConnectable={!selectedEdgeId}
         nodeTypes={nodeTypes}
         fitView
         deleteKeyCode="Delete"
