@@ -34,16 +34,16 @@ export default function C4FlowNode({ id, data }: NodeProps) {
 
   return (
     <>
-      <Handle type="source" id="source-top" position={Position.Top} style={{ ...visibleHandleStyle, top: 0, transform: 'translate(-50%, -50%)' }} />
+      <Handle className="c4-node-handle-visible" type="source" id="source-top" position={Position.Top} style={{ ...visibleHandleStyle, top: 0, transform: 'translate(-50%, -50%)' }} />
       <Handle type="target" id="target-top" position={Position.Top} style={{ ...hiddenHandleStyle, top: 0, transform: 'translate(-50%, -50%)' }} />
 
-      <Handle type="source" id="source-right" position={Position.Right} style={{ ...visibleHandleStyle, right: 0, transform: 'translate(50%, -50%)' }} />
+      <Handle className="c4-node-handle-visible" type="source" id="source-right" position={Position.Right} style={{ ...visibleHandleStyle, right: 0, transform: 'translate(50%, -50%)' }} />
       <Handle type="target" id="target-right" position={Position.Right} style={{ ...hiddenHandleStyle, right: 0, transform: 'translate(50%, -50%)' }} />
 
-      <Handle type="source" id="source-bottom" position={Position.Bottom} style={{ ...visibleHandleStyle, bottom: 0, transform: 'translate(-50%, 50%)' }} />
+      <Handle className="c4-node-handle-visible" type="source" id="source-bottom" position={Position.Bottom} style={{ ...visibleHandleStyle, bottom: 0, transform: 'translate(-50%, 50%)' }} />
       <Handle type="target" id="target-bottom" position={Position.Bottom} style={{ ...hiddenHandleStyle, bottom: 0, transform: 'translate(-50%, 50%)' }} />
 
-      <Handle type="source" id="source-left" position={Position.Left} style={{ ...visibleHandleStyle, left: 0, transform: 'translate(-50%, -50%)' }} />
+      <Handle className="c4-node-handle-visible" type="source" id="source-left" position={Position.Left} style={{ ...visibleHandleStyle, left: 0, transform: 'translate(-50%, -50%)' }} />
       <Handle type="target" id="target-left" position={Position.Left} style={{ ...hiddenHandleStyle, left: 0, transform: 'translate(-50%, -50%)' }} />
 
       <div

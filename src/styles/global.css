@@ -14,3 +14,15 @@ body {
   padding: 0;
   height: 100%;
 }
+
+/* Show source connection points only when hovering a C4 node box */
+.react-flow__node-c4node .c4-node-handle-visible {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.react-flow__node-c4node:hover .c4-node-handle-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
