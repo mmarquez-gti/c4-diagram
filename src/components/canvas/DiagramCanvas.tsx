@@ -119,29 +119,42 @@ export default function DiagramCanvas() {
   // Browser back-button support
   // Keep browser history in sync with the diagram navigation stack so that
   // pressing the browser Back button navigates to the parent diagram.
+  // The popstate handler compares the stored navDepth with the live stack so
+  // it handles both cases correctly:
+  //   • Browser Back pressed:         stack is ahead → call goBack()
+  //   • history.back() we triggered:  stack already matches → no-op
   // ---------------------------------------------------------------------------
-  const prevNavLenRef = useRef<number>(navigationStack.length);
-  const handlingPopstateRef = useRef(false);
+  const prevNavLenRef = useRef<number>(0);
 
   useEffect(() => {
-    const handlePopstate = () => {
-      handlingPopstateRef.current = true;
-      goBack();
+    const handlePopstate = (e: PopStateEvent) => {
+      const depth = (e.state as { navDepth?: number } | null)?.navDepth;
+      if (depth === undefined) return; // not our state entry
+      const currentLen = $navigationStack.get().length;
+      if (currentLen > depth) {
+        goBack();
+      }
     };
     window.addEventListener('popstate', handlePopstate);
-    // Stamp the root state so a back-press from depth>1 lands here, not off-page
-    window.history.replaceState({ navDepth: navigationStack.length }, '');
+    // Stamp the root state so a back-press from depth > 1 stays on-page
+    window.history.replaceState({ navDepth: $navigationStack.get().length }, '');
+    prevNavLenRef.current = $navigationStack.get().length;
     return () => window.removeEventListener('popstate', handlePopstate);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     const len = navigationStack.length;
-    if (!handlingPopstateRef.current && len > prevNavLenRef.current) {
+    if (prevNavLenRef.current === 0) {
+      prevNavLenRef.current = len;
+      return;
+    }
+    if (len > prevNavLenRef.current) {
       // Navigated deeper via drill-down — push a new browser history entry
       window.history.pushState({ navDepth: len }, '');
+    } else if (len < prevNavLenRef.current) {
+      // Programmatic goBack() (e.g. toolbar Back button) — mirror in browser history
+      window.history.back();
     }
-    handlingPopstateRef.current = false;
     prevNavLenRef.current = len;
   }, [navigationStack]);
 
