@@ -192,6 +192,7 @@ export default function PropertiesPanel() {
                       }`}
                       onClick={() => updateEdge(selectedEdge.id, { pathMode: mode.value })}
                       title={mode.label}
+                      aria-label={`${mode.label} path mode`}
                     >
                       <span className="mr-1">{mode.icon}</span>
                       {mode.label}

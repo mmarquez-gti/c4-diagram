@@ -237,9 +237,13 @@ function drawPdfEdge(
   const labelOffsetY = edge.labelOffsetY ?? 0;
 
   // Build full point list: source -> bendPoints -> target
+  const validBendPoints = bendPoints.filter(
+    (bp): bp is { x: number; y: number } =>
+      bp != null && typeof bp.x === 'number' && typeof bp.y === 'number',
+  );
   const allPoints = [
     { x: px(from.x, t), y: py(from.y, t) },
-    ...bendPoints.map((bp) => ({ x: px(bp.x, t), y: py(bp.y, t) })),
+    ...validBendPoints.map((bp) => ({ x: px(bp.x, t), y: py(bp.y, t) })),
     { x: px(to.x, t), y: py(to.y, t) },
   ];
 

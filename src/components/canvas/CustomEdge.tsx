@@ -66,11 +66,11 @@ function buildBezierPath(
     const p3 = points[Math.min(points.length - 1, i + 2)];
 
     // Catmull-Rom to cubic Bezier control points
-    const tension = 6; // smoothness factor
-    const cx1 = p1.x + (p2.x - p0.x) / tension;
-    const cy1 = p1.y + (p2.y - p0.y) / tension;
-    const cx2 = p2.x - (p3.x - p1.x) / tension;
-    const cy2 = p2.y - (p3.y - p1.y) / tension;
+    const smoothnessDivisor = 6;
+    const cx1 = p1.x + (p2.x - p0.x) / smoothnessDivisor;
+    const cy1 = p1.y + (p2.y - p0.y) / smoothnessDivisor;
+    const cx2 = p2.x - (p3.x - p1.x) / smoothnessDivisor;
+    const cy2 = p2.y - (p3.y - p1.y) / smoothnessDivisor;
 
     d += ` C ${cx1},${cy1} ${cx2},${cy2} ${p2.x},${p2.y}`;
   }
@@ -317,7 +317,7 @@ export default function CustomEdge({
       const startY = e.clientY;
       const origOffset = labelOffsetY;
 
-      const svg = document.querySelector('.react-flow__edges')?.closest('svg');
+      const svg = (e.target as HTMLElement).closest('.react-flow')?.querySelector('svg');
       const ctm = svg?.getScreenCTM();
       const scaleY = ctm ? 1 / ctm.d : 1;
 
