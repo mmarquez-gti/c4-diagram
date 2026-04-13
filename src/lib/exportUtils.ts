@@ -247,37 +247,63 @@ function drawPdfEdge(
     { x: px(to.x, t), y: py(to.y, t) },
   ];
 
+  // Expand allPoints into drawPoints, inserting intermediate corner/midpoints so
+  // that orthogonal paths match the canvas getSmoothStepPath routing and arrowheads
+  // always align with the actual final segment direction.
+  let drawPoints = allPoints;
+
+  if (pathMode === 'orthogonal') {
+    if (validBendPoints.length === 0 && allPoints.length === 2) {
+      // No bend points: mimic getSmoothStepPath — route via the midpoint so the
+      // path goes: source → straight to midY/midX → straight to target.
+      // This creates the T-shaped tree routing the canvas shows.
+      const [a, b] = allPoints;
+      const srcHandle = edge.sourceHandle ?? '';
+      const isHorizontalHandle = srcHandle.includes('left') || srcHandle.includes('right');
+
+      if (isHorizontalHandle) {
+        // Left/right handles: horizontal to midX, then vertical, then horizontal
+        const midX = (a.x + b.x) / 2;
+        drawPoints = [a, { x: midX, y: a.y }, { x: midX, y: b.y }, b];
+      } else {
+        // Top/bottom handles (default): vertical to midY, then horizontal, then vertical
+        const midY = (a.y + b.y) / 2;
+        drawPoints = [a, { x: a.x, y: midY }, { x: b.x, y: midY }, b];
+      }
+    } else {
+      // With bend points: expand each segment to horizontal-then-vertical corners
+      // (matches buildOrthogonalPath in CustomEdge.tsx) and track actual directions.
+      const expanded: Array<{ x: number; y: number }> = [allPoints[0]];
+      for (let i = 0; i < allPoints.length - 1; i++) {
+        const a = allPoints[i];
+        const b = allPoints[i + 1];
+        // Insert the corner only when the segment is neither purely horizontal nor vertical
+        if (Math.abs(a.x - b.x) > 0.1 && Math.abs(a.y - b.y) > 0.1) {
+          expanded.push({ x: b.x, y: a.y });
+        }
+        expanded.push(b);
+      }
+      drawPoints = expanded;
+    }
+  }
+
   // Draw edge line(s)
   pdf.setDrawColor(...EDGE_STROKE);
   pdf.setLineWidth(0.8);
   pdf.setLineDashPattern([], 0);
 
-  if (pathMode === 'orthogonal') {
-    // Draw orthogonal segments
-    for (let i = 0; i < allPoints.length - 1; i++) {
-      const a = allPoints[i];
-      const b = allPoints[i + 1];
-      // Horizontal then vertical
-      pdf.line(a.x, a.y, b.x, a.y);
-      pdf.line(b.x, a.y, b.x, b.y);
-    }
-  } else {
-    // Straight or bezier — draw as line segments through points
-    // (For PDF, we use straight line segments; true bezier curves would require
-    // lower-level PDF path commands which jsPDF doesn't easily expose.)
-    for (let i = 0; i < allPoints.length - 1; i++) {
-      pdf.line(allPoints[i].x, allPoints[i].y, allPoints[i + 1].x, allPoints[i + 1].y);
-    }
+  for (let i = 0; i < drawPoints.length - 1; i++) {
+    pdf.line(drawPoints[i].x, drawPoints[i].y, drawPoints[i + 1].x, drawPoints[i + 1].y);
   }
 
-  // Arrowheads — use the first/last segments for direction
+  // Arrowheads — use the first/last drawPoints segments for correct direction
   const dir = edge.direction ?? 'forward';
   pdf.setFillColor(...EDGE_STROKE);
 
-  const firstPt = allPoints[0];
-  const secondPt = allPoints[1];
-  const lastPt = allPoints[allPoints.length - 1];
-  const secondLastPt = allPoints[allPoints.length - 2];
+  const firstPt = drawPoints[0];
+  const secondPt = drawPoints[1];
+  const lastPt = drawPoints[drawPoints.length - 1];
+  const secondLastPt = drawPoints[drawPoints.length - 2];
 
   if (dir === 'forward' || dir === 'bidirectional') {
     drawArrowhead(pdf, lastPt.x, lastPt.y, secondLastPt.x, secondLastPt.y);
@@ -286,34 +312,34 @@ function drawPdfEdge(
     drawArrowhead(pdf, firstPt.x, firstPt.y, secondPt.x, secondPt.y);
   }
 
-  // Label — positioned at midpoint of the path + labelOffsetY
+  // Label — positioned at midpoint along the actual drawn path + labelOffsetY
   if (edge.label) {
     let mx: number;
     let my: number;
 
-    if (allPoints.length === 2) {
-      mx = (allPoints[0].x + allPoints[1].x) / 2;
-      my = (allPoints[0].y + allPoints[1].y) / 2;
+    if (drawPoints.length === 2) {
+      mx = (drawPoints[0].x + drawPoints[1].x) / 2;
+      my = (drawPoints[0].y + drawPoints[1].y) / 2;
     } else {
-      // Find midpoint by total path length
+      // Find midpoint by total path length along drawPoints
       let totalLen = 0;
       const segLens: number[] = [];
-      for (let i = 1; i < allPoints.length; i++) {
-        const dx = allPoints[i].x - allPoints[i - 1].x;
-        const dy = allPoints[i].y - allPoints[i - 1].y;
+      for (let i = 1; i < drawPoints.length; i++) {
+        const dx = drawPoints[i].x - drawPoints[i - 1].x;
+        const dy = drawPoints[i].y - drawPoints[i - 1].y;
         const len = Math.sqrt(dx * dx + dy * dy);
         segLens.push(len);
         totalLen += len;
       }
       const halfLen = totalLen / 2;
       let walked = 0;
-      mx = allPoints[allPoints.length - 1].x;
-      my = allPoints[allPoints.length - 1].y;
+      mx = drawPoints[drawPoints.length - 1].x;
+      my = drawPoints[drawPoints.length - 1].y;
       for (let i = 0; i < segLens.length; i++) {
         if (walked + segLens[i] >= halfLen) {
           const frac = (halfLen - walked) / segLens[i];
-          mx = allPoints[i].x + (allPoints[i + 1].x - allPoints[i].x) * frac;
-          my = allPoints[i].y + (allPoints[i + 1].y - allPoints[i].y) * frac;
+          mx = drawPoints[i].x + (drawPoints[i + 1].x - drawPoints[i].x) * frac;
+          my = drawPoints[i].y + (drawPoints[i + 1].y - drawPoints[i].y) * frac;
           break;
         }
         walked += segLens[i];
