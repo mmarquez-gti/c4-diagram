@@ -271,9 +271,9 @@ export default function CustomEdge({
       const startX = e.clientX;
       const startY = e.clientY;
       const origPoint = bendPoints[bpIndex];
+      const zoom = reactFlow.getViewport().zoom;
 
       const handleMouseMove = (moveEvt: MouseEvent) => {
-        const zoom = reactFlow.getViewport().zoom;
         const dx = (moveEvt.clientX - startX) / zoom;
         const dy = (moveEvt.clientY - startY) / zoom;
 
@@ -308,9 +308,9 @@ export default function CustomEdge({
       const startY = e.clientY;
       const origOffsetX = labelOffsetX;
       const origOffsetY = labelOffsetY;
+      const zoom = reactFlow.getViewport().zoom;
 
       const handleMouseMove = (moveEvt: MouseEvent) => {
-        const zoom = reactFlow.getViewport().zoom;
         const dx = (moveEvt.clientX - startX) / zoom;
         const dy = (moveEvt.clientY - startY) / zoom;
         data.onLabelOffsetChange!(id, origOffsetX + dx, origOffsetY + dy);
