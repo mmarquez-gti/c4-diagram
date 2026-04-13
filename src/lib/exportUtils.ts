@@ -2,17 +2,18 @@
  * Export utilities for the C4 Diagram editor.
  *
  * - exportCurrentLayerToPng: captures the visible ReactFlow canvas as a PNG file.
- * - exportProjectToPdf: generates an interactive PDF where each diagram is a page.
- *   Each page is rendered using jsPDF vector drawing primitives, reading node/edge
- *   data directly from the C4 project model.  No screenshots are taken, so the
- *   result is a clean, scalable, print-friendly document.
+ * - exportProjectToPdf: generates an interactive multi-page PDF of the whole project.
+ *   Each page is produced by temporarily switching the active diagram and capturing
+ *   the ReactFlow canvas as a PNG via html-to-image, so the output is pixel-perfect
+ *   and always matches the React render.
  *   Nodes with child diagrams have clickable links to their subdiagram page.
  *   Sub-diagram pages include a clickable "↑ Back" annotation that links to the parent.
  */
 
 import { toPng } from 'html-to-image';
 import { jsPDF } from 'jspdf';
-import type { C4Diagram, C4Edge, C4Node, C4Project } from './c4/types';
+import type { C4Project } from './c4/types';
+import { $activeDiagramId, $navigationStack } from '../stores/diagramStore';
 
 // ---------------------------------------------------------------------------
 // PNG export
@@ -52,527 +53,74 @@ export async function exportCurrentLayerToPng(filename: string): Promise<void> {
   }
 }
 
+
 // ---------------------------------------------------------------------------
-// Interactive PDF export — vector rendering
+// PDF export — canvas capture approach
 // ---------------------------------------------------------------------------
 
-/** Left/right and bottom margin (pt) */
-const PDF_MARGIN = 32;
 /** Title bar height at top of each page (pt) */
 const TITLE_H = 28;
 /** Back-button bounding box (pt) */
-const BACK_BTN = { x: PDF_MARGIN, y: TITLE_H + 8, w: 72, h: 18 };
+const BACK_BTN = { x: 24, y: TITLE_H + 6, w: 72, h: 18 };
+/** Pixels per point at standard 96 dpi screen (used for image sizing) */
+const PX_PER_PT = 96 / 72;
+
+// ---------------------------------------------------------------------------
+// ReactFlow viewport helper
+// ---------------------------------------------------------------------------
+
+interface Viewport {
+  x: number;
+  y: number;
+  zoom: number;
+}
 
 /**
- * Base scale from diagram coordinate units to PDF points.
- * Chosen so that typical node sizes (~160 units wide) map to ~120 pt,
- * preserving the visual proportions seen in the React Flow canvas.
+ * Reads the current ReactFlow viewport transform from the DOM.
+ * ReactFlow sets `transform: translate(Xpx, Ypx) scale(Z)` on the viewport element.
+ * Returns null if the element is not found or the transform cannot be parsed.
  */
-const DIAGRAM_SCALE = 0.75;
-/** Extra whitespace around the diagram content (diagram units) */
-const DIAGRAM_PADDING = 40;
-/** Maximum content dimension (pt) — keeps pages from becoming enormous */
-const MAX_CONTENT_DIM = 1400;
-/** Minimum content dimension (pt) — keeps pages from becoming tiny */
-const MIN_CONTENT_DIM = 280;
-
-// ---------------------------------------------------------------------------
-// Node colours — matches DiagramCanvas.tsx palette
-// ---------------------------------------------------------------------------
-
-type RGB = [number, number, number];
-
-const NODE_COLORS: Record<string, RGB> = {
-  Person:      [29, 78, 216],
-  System:      [15, 118, 110],
-  SystemExt:   [100, 116, 139],
-  Boundary:    [120, 53, 15],
-  Container:   [6, 95, 70],
-  ContainerDb: [76, 29, 149],
-  Component:   [30, 58, 95],
-};
-
-const EDGE_STROKE: RGB = [148, 163, 184];
-const EDGE_LABEL_BG: RGB = [30, 41, 59];
-
-/** Arrowhead half-angle (radians from the shaft) — controls how "open" the arrow tip is. */
-const ARROW_HALF_ANGLE = Math.PI * 0.82;
-
-/** Vertical positions (fraction of node height) for UML Component port tabs. */
-const COMPONENT_TAB_POSITIONS = [0.28, 0.52];
-
-// ---------------------------------------------------------------------------
-// Coordinate transform helpers
-// ---------------------------------------------------------------------------
-
-interface PdfTransform {
-  scale: number;
-  offsetX: number;
-  offsetY: number;
-}
-
-/** Transform a diagram-space X coordinate to PDF page-space. */
-function px(x: number, t: PdfTransform): number {
-  return x * t.scale + t.offsetX;
-}
-
-/** Transform a diagram-space Y coordinate to PDF page-space. */
-function py(y: number, t: PdfTransform): number {
-  return y * t.scale + t.offsetY;
-}
-
-/** Scale a diagram-space distance to PDF page-space. */
-function ps(s: number, t: PdfTransform): number {
-  return s * t.scale;
-}
-
-function lighten(c: RGB, amount: number): RGB {
-  return [Math.min(255, c[0] + amount), Math.min(255, c[1] + amount), Math.min(255, c[2] + amount)];
-}
-
-function darken(c: RGB, amount: number): RGB {
-  return [Math.max(0, c[0] - amount), Math.max(0, c[1] - amount), Math.max(0, c[2] - amount)];
-}
-
-// ---------------------------------------------------------------------------
-// Bounds computation & transform
-// ---------------------------------------------------------------------------
-
-function computeNodeBounds(
-  nodes: C4Node[],
-): { x: number; y: number; width: number; height: number } | null {
-  if (nodes.length === 0) return null;
-  const minX = Math.min(...nodes.map((n) => n.position.x));
-  const minY = Math.min(...nodes.map((n) => n.position.y));
-  const maxX = Math.max(...nodes.map((n) => n.position.x + n.size.width));
-  const maxY = Math.max(...nodes.map((n) => n.position.y + n.size.height));
-  return { x: minX, y: minY, width: Math.max(maxX - minX, 1), height: Math.max(maxY - minY, 1) };
-}
-
-
-// ---------------------------------------------------------------------------
-// Handle position helpers
-// ---------------------------------------------------------------------------
-
-function getHandlePosition(
-  node: C4Node,
-  handleId: string | undefined,
-  isSource: boolean,
-): { x: number; y: number } {
-  const cx = node.position.x + node.size.width / 2;
-  const top = node.position.y;
-  const bottom = node.position.y + node.size.height;
-  const left = node.position.x;
-  const right = node.position.x + node.size.width;
-  const cy = node.position.y + node.size.height / 2;
-
-  if (!handleId) {
-    return isSource ? { x: cx, y: bottom } : { x: cx, y: top };
-  }
-  if (handleId.includes('top')) return { x: cx, y: top };
-  if (handleId.includes('bottom')) return { x: cx, y: bottom };
-  if (handleId.includes('left')) return { x: left, y: cy };
-  if (handleId.includes('right')) return { x: right, y: cy };
-  return isSource ? { x: cx, y: bottom } : { x: cx, y: top };
-}
-
-// ---------------------------------------------------------------------------
-// Edge drawing
-// ---------------------------------------------------------------------------
-
-function drawArrowhead(
-  pdf: jsPDF,
-  tipX: number,
-  tipY: number,
-  fromX: number,
-  fromY: number,
-  size = 5,
-): void {
-  const angle = Math.atan2(tipY - fromY, tipX - fromX);
-  const a1 = angle + ARROW_HALF_ANGLE;
-  const a2 = angle - ARROW_HALF_ANGLE;
-  pdf.triangle(
-    tipX,
-    tipY,
-    tipX + Math.cos(a1) * size,
-    tipY + Math.sin(a1) * size,
-    tipX + Math.cos(a2) * size,
-    tipY + Math.sin(a2) * size,
-    'F',
-  );
-}
-
-function drawPdfEdge(
-  pdf: jsPDF,
-  edge: C4Edge,
-  nodesMap: Record<string, C4Node>,
-  t: PdfTransform,
-): void {
-  const src = nodesMap[edge.source];
-  const tgt = nodesMap[edge.target];
-  if (!src || !tgt) return;
-
-  const from = getHandlePosition(src, edge.sourceHandle, true);
-  const to = getHandlePosition(tgt, edge.targetHandle, false);
-
-  const pathMode = edge.pathMode ?? 'bezier';
-  const bendPoints = edge.bendPoints ?? [];
-  const labelOffsetX = edge.labelOffsetX ?? 0;
-  const labelOffsetY = edge.labelOffsetY ?? 0;
-
-  // Build full point list: source -> bendPoints -> target
-  const validBendPoints = bendPoints.filter(
-    (bp): bp is { x: number; y: number } =>
-      bp != null && typeof bp.x === 'number' && typeof bp.y === 'number',
-  );
-  const allPoints = [
-    { x: px(from.x, t), y: py(from.y, t) },
-    ...validBendPoints.map((bp) => ({ x: px(bp.x, t), y: py(bp.y, t) })),
-    { x: px(to.x, t), y: py(to.y, t) },
-  ];
-
-  // Expand allPoints into drawPoints, inserting intermediate corner/midpoints so
-  // that orthogonal paths match the canvas getSmoothStepPath routing and arrowheads
-  // always align with the actual final segment direction.
-  let drawPoints = allPoints;
-
-  if (pathMode === 'orthogonal') {
-    if (validBendPoints.length === 0 && allPoints.length === 2) {
-      // No bend points: mimic getSmoothStepPath — route via the midpoint so the
-      // path goes: source → straight to midY/midX → straight to target.
-      // This creates the T-shaped tree routing the canvas shows.
-      const [a, b] = allPoints;
-      const srcHandle = edge.sourceHandle ?? '';
-      const isHorizontalHandle = srcHandle.includes('left') || srcHandle.includes('right');
-
-      if (isHorizontalHandle) {
-        // Left/right handles: horizontal to midX, then vertical, then horizontal
-        const midX = (a.x + b.x) / 2;
-        drawPoints = [a, { x: midX, y: a.y }, { x: midX, y: b.y }, b];
-      } else {
-        // Top/bottom handles (default): vertical to midY, then horizontal, then vertical
-        const midY = (a.y + b.y) / 2;
-        drawPoints = [a, { x: a.x, y: midY }, { x: b.x, y: midY }, b];
-      }
-    } else {
-      // With bend points: expand each segment to horizontal-then-vertical corners
-      // (matches buildOrthogonalPath in CustomEdge.tsx) and track actual directions.
-      const expanded: Array<{ x: number; y: number }> = [allPoints[0]];
-      for (let i = 0; i < allPoints.length - 1; i++) {
-        const a = allPoints[i];
-        const b = allPoints[i + 1];
-        // Insert the corner only when the segment is neither purely horizontal nor vertical
-        if (Math.abs(a.x - b.x) > 0.1 && Math.abs(a.y - b.y) > 0.1) {
-          expanded.push({ x: b.x, y: a.y });
-        }
-        expanded.push(b);
-      }
-      drawPoints = expanded;
-    }
-  }
-
-  // Draw edge line(s)
-  pdf.setDrawColor(...EDGE_STROKE);
-  pdf.setLineWidth(0.8);
-  pdf.setLineDashPattern([], 0);
-
-  for (let i = 0; i < drawPoints.length - 1; i++) {
-    pdf.line(drawPoints[i].x, drawPoints[i].y, drawPoints[i + 1].x, drawPoints[i + 1].y);
-  }
-
-  // Arrowheads — use the first/last drawPoints segments for correct direction
-  const dir = edge.direction ?? 'forward';
-  pdf.setFillColor(...EDGE_STROKE);
-
-  const firstPt = drawPoints[0];
-  const secondPt = drawPoints[1];
-  const lastPt = drawPoints[drawPoints.length - 1];
-  const secondLastPt = drawPoints[drawPoints.length - 2];
-
-  if (dir === 'forward' || dir === 'bidirectional') {
-    drawArrowhead(pdf, lastPt.x, lastPt.y, secondLastPt.x, secondLastPt.y);
-  }
-  if (dir === 'reverse' || dir === 'bidirectional') {
-    drawArrowhead(pdf, firstPt.x, firstPt.y, secondPt.x, secondPt.y);
-  }
-
-  // Label — positioned at midpoint along the actual drawn path + labelOffsetY
-  if (edge.label) {
-    let mx: number;
-    let my: number;
-
-    if (drawPoints.length === 2) {
-      mx = (drawPoints[0].x + drawPoints[1].x) / 2;
-      my = (drawPoints[0].y + drawPoints[1].y) / 2;
-    } else {
-      // Find midpoint by total path length along drawPoints
-      let totalLen = 0;
-      const segLens: number[] = [];
-      for (let i = 1; i < drawPoints.length; i++) {
-        const dx = drawPoints[i].x - drawPoints[i - 1].x;
-        const dy = drawPoints[i].y - drawPoints[i - 1].y;
-        const len = Math.sqrt(dx * dx + dy * dy);
-        segLens.push(len);
-        totalLen += len;
-      }
-      const halfLen = totalLen / 2;
-      let walked = 0;
-      mx = drawPoints[drawPoints.length - 1].x;
-      my = drawPoints[drawPoints.length - 1].y;
-      for (let i = 0; i < segLens.length; i++) {
-        if (walked + segLens[i] >= halfLen) {
-          const frac = (halfLen - walked) / segLens[i];
-          mx = drawPoints[i].x + (drawPoints[i + 1].x - drawPoints[i].x) * frac;
-          my = drawPoints[i].y + (drawPoints[i + 1].y - drawPoints[i].y) * frac;
-          break;
-        }
-        walked += segLens[i];
-      }
-    }
-
-    my += ps(labelOffsetY, t);
-    mx += ps(labelOffsetX, t);
-
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(8);
-    const tw = pdf.getTextWidth(edge.label);
-    const labelW = tw + 8;
-    const labelH = 14;
-    pdf.setFillColor(...EDGE_LABEL_BG);
-    pdf.roundedRect(mx - labelW / 2, my - labelH / 2, labelW, labelH, 3, 3, 'F');
-    pdf.setTextColor(...EDGE_STROKE);
-    pdf.text(edge.label, mx, my + 3, { align: 'center' });
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Node shape drawing
-// ---------------------------------------------------------------------------
-
-function drawNodeShape(pdf: jsPDF, node: C4Node, t: PdfTransform): void {
-  const color: RGB = NODE_COLORS[node.type] ?? [55, 65, 81];
-  const x = px(node.position.x, t);
-  const y = py(node.position.y, t);
-  const w = ps(node.size.width, t);
-  const h = ps(node.size.height, t);
-  const r = Math.min(4, w * 0.03);
-  const borderColor = lighten(color, 60);
-
-  switch (node.type) {
-    case 'Container': {
-      pdf.setFillColor(...color);
-      pdf.roundedRect(x, y, w, h, r, r, 'F');
-      pdf.setDrawColor(...borderColor);
-      pdf.setLineWidth(0.5);
-      pdf.setLineDashPattern([], 0);
-      pdf.roundedRect(x, y, w, h, r, r, 'S');
-      // Header bar
-      const headerH = Math.max(6, Math.min(8 * t.scale, h * 0.12));
-      pdf.setFillColor(...darken(color, 25));
-      pdf.rect(x + 0.5, y + 0.5, w - 1, headerH, 'F');
-      // Three dots
-      const dotR = Math.max(1, 1.5 * t.scale);
-      const dotY = y + headerH / 2 + 0.5;
-      pdf.setFillColor(200, 210, 220);
-      pdf.circle(x + 5 * t.scale, dotY, dotR, 'F');
-      pdf.circle(x + 9 * t.scale, dotY, dotR, 'F');
-      pdf.circle(x + 13 * t.scale, dotY, dotR, 'F');
-      break;
-    }
-    case 'Person': {
-      const rx = Math.min(w * 0.2, 20);
-      const ry = Math.min(h * 0.2, 20);
-      pdf.setFillColor(...color);
-      pdf.roundedRect(x, y, w, h, rx, ry, 'F');
-      pdf.setDrawColor(...borderColor);
-      pdf.setLineWidth(0.5);
-      pdf.setLineDashPattern([], 0);
-      pdf.roundedRect(x, y, w, h, rx, ry, 'S');
-      break;
-    }
-    case 'SystemExt': {
-      pdf.setFillColor(...color);
-      pdf.roundedRect(x, y, w, h, r, r, 'F');
-      pdf.setDrawColor(...borderColor);
-      pdf.setLineWidth(0.8);
-      pdf.setLineDashPattern([3, 2], 0);
-      pdf.roundedRect(x, y, w, h, r, r, 'S');
-      pdf.setLineDashPattern([], 0);
-      break;
-    }
-    case 'Boundary': {
-      pdf.setFillColor(250, 240, 225);
-      pdf.roundedRect(x, y, w, h, r, r, 'F');
-      pdf.setDrawColor(200, 150, 80);
-      pdf.setLineWidth(0.8);
-      pdf.setLineDashPattern([4, 2], 0);
-      pdf.roundedRect(x, y, w, h, r, r, 'S');
-      pdf.setLineDashPattern([], 0);
-      break;
-    }
-    case 'ContainerDb': {
-      const ery = Math.min(h * 0.1, 10 * t.scale);
-      // Body
-      pdf.setFillColor(...color);
-      pdf.rect(x, y + ery, w, h - 2 * ery, 'F');
-      // Bottom ellipse
-      pdf.setFillColor(...color);
-      pdf.ellipse(x + w / 2, y + h - ery, w / 2, ery, 'F');
-      pdf.setDrawColor(...borderColor);
-      pdf.setLineWidth(0.5);
-      pdf.setLineDashPattern([], 0);
-      pdf.ellipse(x + w / 2, y + h - ery, w / 2, ery, 'S');
-      // Side lines
-      pdf.line(x, y + ery, x, y + h - ery);
-      pdf.line(x + w, y + ery, x + w, y + h - ery);
-      // Top ellipse
-      pdf.setFillColor(...darken(color, 20));
-      pdf.ellipse(x + w / 2, y + ery, w / 2, ery, 'F');
-      pdf.setDrawColor(...borderColor);
-      pdf.ellipse(x + w / 2, y + ery, w / 2, ery, 'S');
-      break;
-    }
-    case 'Component': {
-      pdf.setFillColor(...color);
-      pdf.roundedRect(x, y, w, h, r, r, 'F');
-      pdf.setDrawColor(...borderColor);
-      pdf.setLineWidth(0.5);
-      pdf.setLineDashPattern([], 0);
-      pdf.roundedRect(x, y, w, h, r, r, 'S');
-      // UML port tabs on the right
-      const tabW = Math.max(4, 6 * t.scale);
-      const tabH = Math.max(3, 5 * t.scale);
-      for (const pct of COMPONENT_TAB_POSITIONS) {
-        const tabY = y + h * pct;
-        pdf.setFillColor(...color);
-        pdf.rect(x + w - 1, tabY, tabW, tabH, 'F');
-        pdf.setDrawColor(...borderColor);
-        pdf.rect(x + w - 1, tabY, tabW, tabH, 'S');
-      }
-      break;
-    }
-    default: {
-      // System and fallback
-      pdf.setFillColor(...color);
-      pdf.roundedRect(x, y, w, h, r, r, 'F');
-      pdf.setDrawColor(...borderColor);
-      pdf.setLineWidth(0.5);
-      pdf.setLineDashPattern([], 0);
-      pdf.roundedRect(x, y, w, h, r, r, 'S');
-      break;
-    }
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Node text drawing
-// ---------------------------------------------------------------------------
-
-function drawNodeText(pdf: jsPDF, node: C4Node, t: PdfTransform): void {
-  const x = px(node.position.x, t);
-  const y = py(node.position.y, t);
-  const w = ps(node.size.width, t);
-  const h = ps(node.size.height, t);
-  const textCx = x + w / 2;
-  const maxTextW = w - 8;
-
-  // Font sizes (clamped for readability)
-  const typeFontSz = Math.max(5, Math.min(7 * t.scale, 9));
-  const nameFontSz = Math.max(7, Math.min(11 * t.scale, 14));
-  const descFontSz = Math.max(5, Math.min(8 * t.scale, 10));
-  const techFontSz = Math.max(4, Math.min(7 * t.scale, 8));
-
-  // Compute wrapped lines for name & description
-  pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(nameFontSz);
-  const nameLines: string[] = pdf.splitTextToSize(node.label, maxTextW);
-
-  let descLines: string[] = [];
-  if (node.description) {
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(descFontSz);
-    descLines = (pdf.splitTextToSize(node.description, maxTextW) as string[]).slice(0, 3);
-  }
-
-  // Total text block height (for vertical centering)
-  let totalH = typeFontSz * 1.3;
-  totalH += nameLines.length * nameFontSz * 1.2;
-  if (descLines.length > 0) {
-    totalH += 2 + descLines.length * descFontSz * 1.2;
-  }
-  if (node.technology) {
-    totalH += 2 + techFontSz * 1.2;
-  }
-
-  const topPad = node.type === 'Container' ? Math.max(8, 10 * t.scale) : 4;
-  const available = h - topPad - 4;
-  let ty = y + topPad + Math.max(0, (available - totalH) / 2) + typeFontSz;
-
-  // ---- Type label ----
-  const isBoundary = node.type === 'Boundary';
-  pdf.setFont('helvetica', 'normal');
-  pdf.setFontSize(typeFontSz);
-  pdf.setTextColor(...(isBoundary ? [100, 60, 20] as RGB : [255, 255, 255] as RGB));
-  pdf.text(node.type.toUpperCase(), textCx, ty, { align: 'center' });
-  ty += typeFontSz * 1.3;
-
-  // ---- Name ----
-  pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(nameFontSz);
-  pdf.setTextColor(...(isBoundary ? [100, 60, 20] as RGB : [255, 255, 255] as RGB));
-  for (const line of nameLines) {
-    pdf.text(line, textCx, ty, { align: 'center' });
-    ty += nameFontSz * 1.2;
-  }
-
-  // ---- Description ----
-  if (descLines.length > 0) {
-    ty += 2;
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(descFontSz);
-    pdf.setTextColor(...(isBoundary ? [130, 90, 40] as RGB : [210, 220, 230] as RGB));
-    for (const line of descLines) {
-      pdf.text(line, textCx, ty, { align: 'center' });
-      ty += descFontSz * 1.2;
-    }
-  }
-
-  // ---- Technology ----
-  if (node.technology) {
-    ty += 2;
-    pdf.setFont('helvetica', 'italic');
-    pdf.setFontSize(techFontSz);
-    pdf.setTextColor(...(isBoundary ? [150, 110, 50] as RGB : [190, 200, 210] as RGB));
-    pdf.text(`[${node.technology}]`, textCx, ty, { align: 'center' });
-  }
+function readReactFlowViewport(container: HTMLElement): Viewport | null {
+  const el = container.querySelector<HTMLElement>('.react-flow__viewport');
+  if (!el) return null;
+  const transform = el.style.transform;
+  // Expected format: "translate(Xpx, Ypx) scale(Z)"
+  const match = transform.match(/translate\(([-\d.]+)px,\s*([-\d.]+)px\)\s*scale\(([-\d.]+)\)/);
+  if (!match) return null;
+  return {
+    x: parseFloat(match[1]),
+    y: parseFloat(match[2]),
+    zoom: parseFloat(match[3]),
+  };
 }
 
 // ---------------------------------------------------------------------------
 // BFS traversal helper
 // ---------------------------------------------------------------------------
 
-function bfsOrder(
-  project: C4Project,
-): Array<{ diagram: C4Diagram; parentDiagramId: string | null }> {
-  const result: Array<{ diagram: C4Diagram; parentDiagramId: string | null }> = [];
-  const queue: Array<{ diagId: string; parentDiagramId: string | null }> = [
-    { diagId: project.rootDiagramId, parentDiagramId: null },
-  ];
+interface DiagramEntry {
+  diagramId: string;
+  parentDiagramId: string | null;
+}
+
+function bfsOrder(project: C4Project): DiagramEntry[] {
+  const result: DiagramEntry[] = [];
+  const queue: DiagramEntry[] = [{ diagramId: project.rootDiagramId, parentDiagramId: null }];
   const visited = new Set<string>();
 
   while (queue.length > 0) {
-    const { diagId, parentDiagramId } = queue.shift()!;
-    if (visited.has(diagId)) continue;
-    visited.add(diagId);
+    const entry = queue.shift()!;
+    if (visited.has(entry.diagramId)) continue;
+    visited.add(entry.diagramId);
 
-    const diagram = project.diagrams[diagId];
+    const diagram = project.diagrams[entry.diagramId];
     if (!diagram) continue;
 
-    result.push({ diagram, parentDiagramId });
+    result.push(entry);
 
     for (const node of diagram.nodes) {
       if (node.childDiagramId && project.diagrams[node.childDiagramId]) {
-        queue.push({ diagId: node.childDiagramId, parentDiagramId: diagId });
+        queue.push({ diagramId: node.childDiagramId, parentDiagramId: entry.diagramId });
       }
     }
   }
@@ -581,123 +129,162 @@ function bfsOrder(
 }
 
 // ---------------------------------------------------------------------------
+// Capture helper
+// ---------------------------------------------------------------------------
+
+interface CapturedPage {
+  diagramId: string;
+  title: string;
+  dataUrl: string;
+  /** CSS-pixel width of the canvas container at capture time */
+  containerWidth: number;
+  /** CSS-pixel height of the canvas container at capture time */
+  containerHeight: number;
+  /** ReactFlow viewport transform at capture time (null if unreadable) */
+  viewport: Viewport | null;
+}
+
+/**
+ * Hides ReactFlow UI chrome (controls, minimap, attribution) in `container`,
+ * captures a PNG data URL, then restores visibility.
+ */
+async function captureCanvasPng(container: HTMLElement): Promise<string> {
+  const controls = container.querySelectorAll<HTMLElement>(
+    '.react-flow__controls, .react-flow__minimap, .react-flow__attribution',
+  );
+  controls.forEach((el) => (el.style.visibility = 'hidden'));
+  try {
+    return await toPng(container, {
+      backgroundColor: '#030712',
+      pixelRatio: 2,
+    });
+  } finally {
+    controls.forEach((el) => (el.style.visibility = ''));
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Public PDF export function
 // ---------------------------------------------------------------------------
 
 /**
- * Compute the page dimensions and diagram transform for a single diagram,
- * sizing the page to fit the diagram's natural proportions rather than
- * using a fixed page format.
- */
-function computeDynamicPage(
-  nodes: C4Node[],
-  contentTop: number,
-): { pageW: number; pageH: number; transform: PdfTransform } {
-  const bounds = computeNodeBounds(nodes);
-  if (!bounds) {
-    // Empty diagram — return a small fallback page
-    return {
-      pageW: MIN_CONTENT_DIM + PDF_MARGIN * 2,
-      pageH: MIN_CONTENT_DIM + contentTop + PDF_MARGIN,
-      transform: { scale: 1, offsetX: PDF_MARGIN, offsetY: contentTop },
-    };
-  }
-
-  // Diagram-space content area (including padding)
-  const diagW = bounds.width + DIAGRAM_PADDING * 2;
-  const diagH = bounds.height + DIAGRAM_PADDING * 2;
-
-  // Choose a scale that preserves natural proportions but stays in bounds
-  let scale = DIAGRAM_SCALE;
-  if (diagW * scale > MAX_CONTENT_DIM) scale = Math.min(scale, MAX_CONTENT_DIM / diagW);
-  if (diagH * scale > MAX_CONTENT_DIM) scale = Math.min(scale, MAX_CONTENT_DIM / diagH);
-  if (diagW * scale < MIN_CONTENT_DIM && diagH * scale < MIN_CONTENT_DIM) {
-    scale = Math.max(MIN_CONTENT_DIM / diagW, MIN_CONTENT_DIM / diagH);
-  }
-
-  const contentW = diagW * scale;
-  const contentH = diagH * scale;
-  const pageW = contentW + PDF_MARGIN * 2;
-  const pageH = contentH + contentTop + PDF_MARGIN;
-
-  // Map the top-left of the padded bounds to the content origin (PDF_MARGIN, contentTop)
-  const transform: PdfTransform = {
-    scale,
-    offsetX: PDF_MARGIN - (bounds.x - DIAGRAM_PADDING) * scale,
-    offsetY: contentTop - (bounds.y - DIAGRAM_PADDING) * scale,
-  };
-
-  return { pageW, pageH, transform };
-}
-
-/**
  * Generates an interactive multi-page PDF of the whole project.
  *
- * Each page is sized to match the natural bounding box of its diagram,
- * preserving the same proportions and relative layout visible in the
- * React Flow canvas.  No fixed page format (e.g. A4) is imposed.
+ * For each diagram the function temporarily switches the active diagram,
+ * waits for ReactFlow to re-render and fit the view, then captures the canvas
+ * as a PNG via html-to-image.  The PNG is embedded verbatim in the PDF page so
+ * the output is pixel-perfect and always matches what the React canvas shows.
  *
- * - One page per diagram (BFS order).
- * - White background with colored C4 node shapes.
- * - Nodes with a child diagram have a clickable region linking to the sub-diagram page.
- * - Sub-diagram pages include a clickable "↑ Back" link to their parent page.
+ * Interactive features:
+ * - Each page has a dark title bar with the diagram name.
+ * - Sub-diagram pages have a "↑ Back" button that links to the parent page.
+ * - Nodes that have a child diagram are clickable and navigate to that page.
+ *
+ * @param project   The C4 project to export.
+ * @param filename  Base filename without extension.
  */
 export async function exportProjectToPdf(project: C4Project, filename: string): Promise<void> {
   const ordered = bfsOrder(project);
   if (ordered.length === 0) return;
 
-  // Build lookups: diagramId → 1-based page number, diagramId → parent
+  const container = document.getElementById('diagram-canvas-container');
+  if (!container) throw new Error('Canvas container element not found.');
+
+  // Save state we will temporarily mutate
+  const savedActiveDiagramId = $activeDiagramId.get();
+  const savedNavigationStack = $navigationStack.get();
+
+  const capturedPages: CapturedPage[] = [];
+
+  try {
+    for (const { diagramId } of ordered) {
+      const diagram = project.diagrams[diagramId];
+      if (!diagram) continue;
+
+      // Switch active diagram (directly set atom to avoid side-effects on
+      // the navigation stack; we restore everything in the finally block)
+      $activeDiagramId.set(diagramId);
+
+      // Give ReactFlow two animation frames + the 50 ms fitView timer to settle
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            setTimeout(resolve, 100);
+          });
+        });
+      });
+
+      const rect = container.getBoundingClientRect();
+      const viewport = readReactFlowViewport(container);
+      const dataUrl = await captureCanvasPng(container);
+
+      capturedPages.push({
+        diagramId,
+        title: diagram.title,
+        dataUrl,
+        containerWidth: rect.width,
+        containerHeight: rect.height,
+        viewport,
+      });
+    }
+  } finally {
+    // Restore original diagram unconditionally
+    $activeDiagramId.set(savedActiveDiagramId);
+    $navigationStack.set(savedNavigationStack);
+  }
+
+  if (capturedPages.length === 0) return;
+
+  // -------------------------------------------------------------------------
+  // Build lookup tables
+  // -------------------------------------------------------------------------
+
   const pageOf: Record<string, number> = {};
-  ordered.forEach(({ diagram }, i) => {
-    pageOf[diagram.id] = i + 1;
-  });
+  ordered.forEach(({ diagramId }, i) => { pageOf[diagramId] = i + 1; });
 
   const parentOf: Record<string, string> = {};
-  ordered.forEach(({ diagram, parentDiagramId }) => {
-    if (parentDiagramId) parentOf[diagram.id] = parentDiagramId;
+  ordered.forEach(({ diagramId, parentDiagramId }) => {
+    if (parentDiagramId) parentOf[diagramId] = parentDiagramId;
   });
 
-  // Store per-page data so we can add interactive links after all pages are drawn
-  const pageTransforms: PdfTransform[] = [];
-  const pageSizes: Array<{ w: number; h: number }> = [];
+  // -------------------------------------------------------------------------
+  // Construct PDF
+  // -------------------------------------------------------------------------
 
-  // Compute all page sizes first so we can initialise jsPDF with the first page's size
-  const pageData = ordered.map(({ diagram }) => {
-    const isRoot = diagram.id === project.rootDiagramId;
-    const contentTop = isRoot ? TITLE_H + 8 : BACK_BTN.y + BACK_BTN.h + 8;
-    return { diagram, isRoot, contentTop, ...computeDynamicPage(diagram.nodes, contentTop) };
-  });
+  // Each PDF page width equals the canvas CSS-pixel width converted to pt.
+  // Height = canvas height (pt) + title bar.
+  const firstPage = capturedPages[0];
+  const firstPageW = firstPage.containerWidth / PX_PER_PT;
+  const firstPageH = firstPage.containerHeight / PX_PER_PT + TITLE_H;
 
-  const first = pageData[0];
   const pdf = new jsPDF({
-    orientation: first.pageW >= first.pageH ? 'landscape' : 'portrait',
+    orientation: firstPageW >= firstPageH ? 'landscape' : 'portrait',
     unit: 'pt',
-    format: [first.pageW, first.pageH],
+    format: [firstPageW, firstPageH],
   });
 
-  for (let i = 0; i < pageData.length; i++) {
-    const { diagram, isRoot, contentTop, pageW, pageH, transform } = pageData[i];
+  for (let i = 0; i < capturedPages.length; i++) {
+    const page = capturedPages[i];
+    const isRoot = page.diagramId === project.rootDiagramId;
+
+    const pageW = page.containerWidth / PX_PER_PT;
+    const pageH = page.containerHeight / PX_PER_PT + TITLE_H;
+    const imgY = TITLE_H;
+    const imgH = page.containerHeight / PX_PER_PT;
 
     if (i > 0) {
       pdf.addPage([pageW, pageH], pageW >= pageH ? 'landscape' : 'portrait');
     }
 
-    pageSizes.push({ w: pageW, h: pageH });
-    pageTransforms.push(transform);
-
-    // ----- White background -----
-    pdf.setFillColor(255, 255, 255);
-    pdf.rect(0, 0, pageW, pageH, 'F');
-
-    // ----- Title bar -----
+    // ---- Dark title bar ----
     pdf.setFillColor(12, 15, 26);
     pdf.rect(0, 0, pageW, TITLE_H, 'F');
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(13);
     pdf.setTextColor(139, 154, 176);
-    pdf.text(diagram.title, PDF_MARGIN, TITLE_H - 8);
+    pdf.text(page.title, 24, TITLE_H - 8);
 
-    // ----- Back button -----
+    // ---- Back button (non-root pages) ----
     if (!isRoot) {
       const { x: bx, y: by, w: bw, h: bh } = BACK_BTN;
       pdf.setFillColor(30, 42, 66);
@@ -711,54 +298,62 @@ export async function exportProjectToPdf(project: C4Project, filename: string): 
       pdf.text('↑ Back', bx + bw / 2, by + bh / 2 + 3, { align: 'center' });
     }
 
-    if (diagram.nodes.length === 0) continue;
-
-    // Build a quick lookup for edge rendering
-    const nodesMap: Record<string, C4Node> = {};
-    for (const node of diagram.nodes) {
-      nodesMap[node.id] = node;
-    }
-
-    // Draw edges first (they appear below nodes visually)
-    for (const edge of diagram.edges) {
-      drawPdfEdge(pdf, edge, nodesMap, transform);
-    }
-
-    // Draw nodes on top
-    for (const node of diagram.nodes) {
-      drawNodeShape(pdf, node, transform);
-      drawNodeText(pdf, node, transform);
-    }
+    // ---- Embedded canvas PNG ----
+    pdf.addImage(page.dataUrl, 'PNG', 0, imgY, pageW, imgH);
   }
 
-  // ----- Interactive links (added after all pages are built) -----
-  for (let i = 0; i < pageData.length; i++) {
-    const { diagram, isRoot } = pageData[i];
-    pdf.setPage(i + 1);
-    const t = pageTransforms[i];
+  // -------------------------------------------------------------------------
+  // Interactive links (added after all pages are drawn)
+  // -------------------------------------------------------------------------
 
-    // Back button link
-    if (!isRoot && parentOf[diagram.id]) {
-      const parentPage = pageOf[parentOf[diagram.id]];
+  for (let i = 0; i < capturedPages.length; i++) {
+    const page = capturedPages[i];
+    const isRoot = page.diagramId === project.rootDiagramId;
+    pdf.setPage(i + 1);
+
+    const pageW = page.containerWidth / PX_PER_PT;
+    const imgH = page.containerHeight / PX_PER_PT;
+
+    // ---- Back button link ----
+    if (!isRoot && parentOf[page.diagramId]) {
+      const parentPage = pageOf[parentOf[page.diagramId]];
       if (parentPage !== undefined) {
         const { x: bx, y: by, w: bw, h: bh } = BACK_BTN;
         pdf.link(bx, by, bw, bh, { pageNumber: parentPage });
       }
     }
 
-    // Drill-down node links
-    for (const node of diagram.nodes) {
-      if (!node.childDiagramId) continue;
-      const targetPage = pageOf[node.childDiagramId];
-      if (targetPage === undefined) continue;
-      const nx = px(node.position.x, t);
-      const ny = py(node.position.y, t);
-      const nw = ps(node.size.width, t);
-      const nh = ps(node.size.height, t);
-      pdf.link(nx, ny, nw, nh, { pageNumber: targetPage });
+    // ---- Drill-down node links ----
+    const diagram = project.diagrams[page.diagramId];
+    if (!diagram) continue;
+
+    const vp = page.viewport;
+    if (vp) {
+      // Map diagram coordinates → screen pixels → PDF points
+      const scaleX = pageW / page.containerWidth;
+      const scaleY = imgH / page.containerHeight;
+
+      for (const node of diagram.nodes) {
+        if (!node.childDiagramId) continue;
+        const targetPage = pageOf[node.childDiagramId];
+        if (targetPage === undefined) continue;
+
+        // Diagram-space → screen-pixel (CSS px)
+        const screenX = node.position.x * vp.zoom + vp.x;
+        const screenY = node.position.y * vp.zoom + vp.y;
+        const screenW = node.size.width * vp.zoom;
+        const screenH = node.size.height * vp.zoom;
+
+        // Screen-pixel → PDF point (offset by title bar)
+        const lx = screenX * scaleX;
+        const ly = TITLE_H + screenY * scaleY;
+        const lw = screenW * scaleX;
+        const lh = screenH * scaleY;
+
+        pdf.link(lx, ly, lw, lh, { pageNumber: targetPage });
+      }
     }
   }
 
   pdf.save(`${filename}.pdf`);
 }
-
