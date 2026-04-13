@@ -45,14 +45,15 @@ export function TextLabelNode({ data }: NodeProps) {
       >
         <div
           style={{
-            color: textColor,
+            color: d.label ? textColor : `${textColor}55`,
             fontWeight: 600,
             fontSize: '14px',
             lineHeight: 1.35,
             wordBreak: 'break-word',
+            fontStyle: d.label ? 'normal' : 'italic',
           }}
         >
-          {d.label}
+          {d.label || 'Text…'}
         </div>
         {d.description && (
           <div
