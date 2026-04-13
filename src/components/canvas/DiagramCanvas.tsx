@@ -61,6 +61,12 @@ const nodeTypes = { c4node: C4FlowNode, annotation: AnnotationNode, groupbox: Gr
 const edgeTypes = { custom: CustomEdge };
 
 // ---------------------------------------------------------------------------
+// Visual element ID helpers (annotations use 'ann-' prefix, group boxes 'grp-')
+// ---------------------------------------------------------------------------
+const isAnnotationId = (id: string) => id.startsWith('ann-');
+const isGroupBoxId = (id: string) => id.startsWith('grp-');
+
+// ---------------------------------------------------------------------------
 // Node type colour map
 // ---------------------------------------------------------------------------
 const NODE_COLORS: Record<string, string> = {
@@ -468,24 +474,18 @@ export default function DiagramCanvas() {
       onNodesChange(changes);
       for (const change of changes) {
         if (change.type === 'remove') {
-          const isAnnotation = change.id.startsWith('ann-');
-          const isGroupBox = change.id.startsWith('grp-');
-          if (isAnnotation) removeAnnotation(change.id);
-          else if (isGroupBox) removeGroupBox(change.id);
+          if (isAnnotationId(change.id)) removeAnnotation(change.id);
+          else if (isGroupBoxId(change.id)) removeGroupBox(change.id);
           else removeNode(change.id);
         }
         if (change.type === 'position' && !change.dragging && change.position) {
-          const isAnnotation = change.id.startsWith('ann-');
-          const isGroupBox = change.id.startsWith('grp-');
-          if (isAnnotation) updateAnnotationPosition(change.id, change.position.x, change.position.y);
-          else if (isGroupBox) updateGroupBoxPosition(change.id, change.position.x, change.position.y);
+          if (isAnnotationId(change.id)) updateAnnotationPosition(change.id, change.position.x, change.position.y);
+          else if (isGroupBoxId(change.id)) updateGroupBoxPosition(change.id, change.position.x, change.position.y);
           else updateNodePosition(change.id, change.position.x, change.position.y);
         }
         if (change.type === 'dimensions' && change.dimensions && !change.resizing) {
-          const isAnnotation = change.id.startsWith('ann-');
-          const isGroupBox = change.id.startsWith('grp-');
-          if (isAnnotation) updateAnnotationSize(change.id, change.dimensions.width, change.dimensions.height);
-          else if (isGroupBox) updateGroupBoxSize(change.id, change.dimensions.width, change.dimensions.height);
+          if (isAnnotationId(change.id)) updateAnnotationSize(change.id, change.dimensions.width, change.dimensions.height);
+          else if (isGroupBoxId(change.id)) updateGroupBoxSize(change.id, change.dimensions.width, change.dimensions.height);
           else updateNodeSize(change.id, change.dimensions.width, change.dimensions.height);
         }
       }
@@ -518,8 +518,8 @@ export default function DiagramCanvas() {
       if (selectedEdgeId) return;
       // Prevent connecting annotations or group boxes
       if (
-        connection.source?.startsWith('ann-') || connection.source?.startsWith('grp-') ||
-        connection.target?.startsWith('ann-') || connection.target?.startsWith('grp-')
+        (connection.source && (isAnnotationId(connection.source) || isGroupBoxId(connection.source))) ||
+        (connection.target && (isAnnotationId(connection.target) || isGroupBoxId(connection.target)))
       ) return;
 
       setEdges((eds) => addEdge(connection, eds));
