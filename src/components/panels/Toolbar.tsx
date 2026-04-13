@@ -8,6 +8,8 @@ import {
   createProject,
   loadProject,
   addNode,
+  addAnnotation,
+  addGroupBox,
   goBack,
   navigateTo,
   undo,
@@ -55,6 +57,16 @@ export default function Toolbar() {
       createProject();
     }
     addNode({ type, label: type, x: 120 + Math.random() * 300, y: 80 + Math.random() * 200 });
+  };
+
+  const handleAddAnnotation = () => {
+    if (!project) createProject();
+    addAnnotation({ text: 'Text', x: 120 + Math.random() * 300, y: 80 + Math.random() * 200 });
+  };
+
+  const handleAddGroupBox = () => {
+    if (!project) createProject();
+    addGroupBox({ label: 'Group', x: 80 + Math.random() * 200, y: 60 + Math.random() * 150 });
   };
 
   const handleExportMermaid = () => {
@@ -123,6 +135,24 @@ export default function Toolbar() {
             + {label}
           </button>
         ))}
+      </div>
+
+      {/* Visual annotations & group boxes */}
+      <div className="flex items-center gap-1 border-r border-gray-700 pr-2 mr-1">
+        <button
+          onClick={handleAddAnnotation}
+          className="px-2 py-1 text-xs rounded bg-gray-700 hover:bg-gray-600 transition-colors"
+          title="Add free text annotation"
+        >
+          + Text
+        </button>
+        <button
+          onClick={handleAddGroupBox}
+          className="px-2 py-1 text-xs rounded bg-gray-700 hover:bg-gray-600 transition-colors"
+          title="Add visual grouping box"
+        >
+          + Group Box
+        </button>
       </div>
 
       {/* Undo / Redo */}
