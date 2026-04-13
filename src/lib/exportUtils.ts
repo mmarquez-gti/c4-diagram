@@ -64,6 +64,13 @@ const TITLE_H = 28;
 const BACK_BTN = { x: 24, y: TITLE_H + 6, w: 72, h: 18 };
 /** Pixels per point at standard 96 dpi screen (used for image sizing) */
 const PX_PER_PT = 96 / 72;
+/**
+ * Time (ms) to wait after switching the active diagram before capturing.
+ * ReactFlow's FitViewOnDiagramChange component uses a 50 ms timer internally;
+ * this value gives two animation frames (~32 ms) plus extra headroom for the
+ * fitView animation and any CSS transitions to settle.
+ */
+const REACTFLOW_SETTLE_DELAY_MS = 150;
 
 // ---------------------------------------------------------------------------
 // ReactFlow viewport helper
@@ -77,14 +84,17 @@ interface Viewport {
 
 /**
  * Reads the current ReactFlow viewport transform from the DOM.
- * ReactFlow sets `transform: translate(Xpx, Ypx) scale(Z)` on the viewport element.
+ * ReactFlow sets `transform: translate(Xpx, Ypx) scale(Z)` on the viewport
+ * element (.react-flow__viewport).  This is an internal implementation detail
+ * of @xyflow/react and may change across major versions; if parsing fails the
+ * function returns null and callers fall back to skipping drill-down links.
  * Returns null if the element is not found or the transform cannot be parsed.
  */
 function readReactFlowViewport(container: HTMLElement): Viewport | null {
   const el = container.querySelector<HTMLElement>('.react-flow__viewport');
   if (!el) return null;
   const transform = el.style.transform;
-  // Expected format: "translate(Xpx, Ypx) scale(Z)"
+  // Expected format (as of @xyflow/react v12): "translate(Xpx, Ypx) scale(Z)"
   const match = transform.match(/translate\(([-\d.]+)px,\s*([-\d.]+)px\)\s*scale\(([-\d.]+)\)/);
   if (!match) return null;
   return {
@@ -201,15 +211,18 @@ export async function exportProjectToPdf(project: C4Project, filename: string): 
       const diagram = project.diagrams[diagramId];
       if (!diagram) continue;
 
-      // Switch active diagram (directly set atom to avoid side-effects on
-      // the navigation stack; we restore everything in the finally block)
+      // Switch active diagram directly on the atom rather than through
+      // jumpToDiagram / navigateTo so that the navigation breadcrumb stack
+      // and history are not modified.  We restore both atoms unconditionally
+      // in the finally block, so the user's original view is always recovered.
       $activeDiagramId.set(diagramId);
 
-      // Give ReactFlow two animation frames + the 50 ms fitView timer to settle
+      // Give ReactFlow two animation frames + extra headroom for the internal
+      // 50 ms fitView timer (FitViewOnDiagramChange) to settle before capture.
       await new Promise<void>((resolve) => {
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
-            setTimeout(resolve, 100);
+            setTimeout(resolve, REACTFLOW_SETTLE_DELAY_MS);
           });
         });
       });
