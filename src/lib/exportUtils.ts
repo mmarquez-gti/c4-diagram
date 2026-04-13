@@ -56,15 +56,25 @@ export async function exportCurrentLayerToPng(filename: string): Promise<void> {
 // Interactive PDF export — vector rendering
 // ---------------------------------------------------------------------------
 
-/** A4 dimensions in pt */
-const PAGE_W = 595;
-const PAGE_H = 842;
-/** Left/right and bottom margin */
+/** Left/right and bottom margin (pt) */
 const PDF_MARGIN = 32;
-/** Title bar height at top of each page */
+/** Title bar height at top of each page (pt) */
 const TITLE_H = 28;
-/** Back-button bounding box */
+/** Back-button bounding box (pt) */
 const BACK_BTN = { x: PDF_MARGIN, y: TITLE_H + 8, w: 72, h: 18 };
+
+/**
+ * Base scale from diagram coordinate units to PDF points.
+ * Chosen so that typical node sizes (~160 units wide) map to ~120 pt,
+ * preserving the visual proportions seen in the React Flow canvas.
+ */
+const DIAGRAM_SCALE = 0.75;
+/** Extra whitespace around the diagram content (diagram units) */
+const DIAGRAM_PADDING = 40;
+/** Maximum content dimension (pt) — keeps pages from becoming enormous */
+const MAX_CONTENT_DIM = 1400;
+/** Minimum content dimension (pt) — keeps pages from becoming tiny */
+const MIN_CONTENT_DIM = 280;
 
 // ---------------------------------------------------------------------------
 // Node colours — matches DiagramCanvas.tsx palette
@@ -139,33 +149,6 @@ function computeNodeBounds(
   return { x: minX, y: minY, width: Math.max(maxX - minX, 1), height: Math.max(maxY - minY, 1) };
 }
 
-/**
- * Compute a PdfTransform that maps diagram-space bounds into a PDF content
- * rectangle, preserving aspect ratio and centering the result.
- */
-function computeTransform(
-  bounds: { x: number; y: number; width: number; height: number },
-  contentX: number,
-  contentY: number,
-  contentW: number,
-  contentH: number,
-  padding = 30,
-): PdfTransform {
-  const padded = {
-    x: bounds.x - padding,
-    y: bounds.y - padding,
-    width: bounds.width + padding * 2,
-    height: bounds.height + padding * 2,
-  };
-  const scale = Math.min(contentW / padded.width, contentH / padded.height);
-  const scaledW = padded.width * scale;
-  const scaledH = padded.height * scale;
-  return {
-    scale,
-    offsetX: contentX + (contentW - scaledW) / 2 - padded.x * scale,
-    offsetY: contentY + (contentH - scaledH) / 2 - padded.y * scale,
-  };
-}
 
 // ---------------------------------------------------------------------------
 // Handle position helpers
@@ -602,17 +585,61 @@ function bfsOrder(
 // ---------------------------------------------------------------------------
 
 /**
+ * Compute the page dimensions and diagram transform for a single diagram,
+ * sizing the page to fit the diagram's natural proportions rather than
+ * using a fixed page format.
+ */
+function computeDynamicPage(
+  nodes: C4Node[],
+  contentTop: number,
+): { pageW: number; pageH: number; transform: PdfTransform } {
+  const bounds = computeNodeBounds(nodes);
+  if (!bounds) {
+    // Empty diagram — return a small fallback page
+    return {
+      pageW: MIN_CONTENT_DIM + PDF_MARGIN * 2,
+      pageH: MIN_CONTENT_DIM + contentTop + PDF_MARGIN,
+      transform: { scale: 1, offsetX: PDF_MARGIN, offsetY: contentTop },
+    };
+  }
+
+  // Diagram-space content area (including padding)
+  const diagW = bounds.width + DIAGRAM_PADDING * 2;
+  const diagH = bounds.height + DIAGRAM_PADDING * 2;
+
+  // Choose a scale that preserves natural proportions but stays in bounds
+  let scale = DIAGRAM_SCALE;
+  if (diagW * scale > MAX_CONTENT_DIM) scale = Math.min(scale, MAX_CONTENT_DIM / diagW);
+  if (diagH * scale > MAX_CONTENT_DIM) scale = Math.min(scale, MAX_CONTENT_DIM / diagH);
+  if (diagW * scale < MIN_CONTENT_DIM && diagH * scale < MIN_CONTENT_DIM) {
+    scale = Math.max(MIN_CONTENT_DIM / diagW, MIN_CONTENT_DIM / diagH);
+  }
+
+  const contentW = diagW * scale;
+  const contentH = diagH * scale;
+  const pageW = contentW + PDF_MARGIN * 2;
+  const pageH = contentH + contentTop + PDF_MARGIN;
+
+  // Map the top-left of the padded bounds to the content origin (PDF_MARGIN, contentTop)
+  const transform: PdfTransform = {
+    scale,
+    offsetX: PDF_MARGIN - (bounds.x - DIAGRAM_PADDING) * scale,
+    offsetY: contentTop - (bounds.y - DIAGRAM_PADDING) * scale,
+  };
+
+  return { pageW, pageH, transform };
+}
+
+/**
  * Generates an interactive multi-page PDF of the whole project.
  *
- * Each page is rendered using jsPDF vector drawing primitives, reading
- * node positions, edge connections, and styling directly from the C4 data
- * model.  No screenshots are taken — the result is a clean, scalable,
- * print-friendly document.
+ * Each page is sized to match the natural bounding box of its diagram,
+ * preserving the same proportions and relative layout visible in the
+ * React Flow canvas.  No fixed page format (e.g. A4) is imposed.
  *
  * - One page per diagram (BFS order).
  * - White background with colored C4 node shapes.
- * - Nodes with a child diagram have a clickable region that links to the
- *   corresponding sub-diagram page.
+ * - Nodes with a child diagram have a clickable region linking to the sub-diagram page.
  * - Sub-diagram pages include a clickable "↑ Back" link to their parent page.
  */
 export async function exportProjectToPdf(project: C4Project, filename: string): Promise<void> {
@@ -630,31 +657,47 @@ export async function exportProjectToPdf(project: C4Project, filename: string): 
     if (parentDiagramId) parentOf[diagram.id] = parentDiagramId;
   });
 
-  const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
-
-  // Store the transform used for each page so we can compute link rects later
+  // Store per-page data so we can add interactive links after all pages are drawn
   const pageTransforms: PdfTransform[] = [];
+  const pageSizes: Array<{ w: number; h: number }> = [];
 
-  const contentW = PAGE_W - PDF_MARGIN * 2;
+  // Compute all page sizes first so we can initialise jsPDF with the first page's size
+  const pageData = ordered.map(({ diagram }) => {
+    const isRoot = diagram.id === project.rootDiagramId;
+    const contentTop = isRoot ? TITLE_H + 8 : BACK_BTN.y + BACK_BTN.h + 8;
+    return { diagram, isRoot, contentTop, ...computeDynamicPage(diagram.nodes, contentTop) };
+  });
 
-  for (let i = 0; i < ordered.length; i++) {
-    const { diagram } = ordered[i];
-    if (i > 0) pdf.addPage();
+  const first = pageData[0];
+  const pdf = new jsPDF({
+    orientation: first.pageW >= first.pageH ? 'landscape' : 'portrait',
+    unit: 'pt',
+    format: [first.pageW, first.pageH],
+  });
+
+  for (let i = 0; i < pageData.length; i++) {
+    const { diagram, isRoot, contentTop, pageW, pageH, transform } = pageData[i];
+
+    if (i > 0) {
+      pdf.addPage([pageW, pageH], pageW >= pageH ? 'landscape' : 'portrait');
+    }
+
+    pageSizes.push({ w: pageW, h: pageH });
+    pageTransforms.push(transform);
 
     // ----- White background -----
     pdf.setFillColor(255, 255, 255);
-    pdf.rect(0, 0, PAGE_W, PAGE_H, 'F');
+    pdf.rect(0, 0, pageW, pageH, 'F');
 
     // ----- Title bar -----
     pdf.setFillColor(12, 15, 26);
-    pdf.rect(0, 0, PAGE_W, TITLE_H, 'F');
+    pdf.rect(0, 0, pageW, TITLE_H, 'F');
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(13);
     pdf.setTextColor(139, 154, 176);
     pdf.text(diagram.title, PDF_MARGIN, TITLE_H - 8);
 
     // ----- Back button -----
-    const isRoot = diagram.id === project.rootDiagramId;
     if (!isRoot) {
       const { x: bx, y: by, w: bw, h: bh } = BACK_BTN;
       pdf.setFillColor(30, 42, 66);
@@ -668,18 +711,7 @@ export async function exportProjectToPdf(project: C4Project, filename: string): 
       pdf.text('↑ Back', bx + bw / 2, by + bh / 2 + 3, { align: 'center' });
     }
 
-    // ----- Content area -----
-    const contentTop = isRoot ? TITLE_H + 8 : BACK_BTN.y + BACK_BTN.h + 8;
-    const contentH = PAGE_H - contentTop - PDF_MARGIN;
-
-    const bounds = computeNodeBounds(diagram.nodes);
-    if (!bounds) {
-      pageTransforms.push({ scale: 1, offsetX: 0, offsetY: 0 });
-      continue;
-    }
-
-    const t = computeTransform(bounds, PDF_MARGIN, contentTop, contentW, contentH);
-    pageTransforms.push(t);
+    if (diagram.nodes.length === 0) continue;
 
     // Build a quick lookup for edge rendering
     const nodesMap: Record<string, C4Node> = {};
@@ -689,24 +721,23 @@ export async function exportProjectToPdf(project: C4Project, filename: string): 
 
     // Draw edges first (they appear below nodes visually)
     for (const edge of diagram.edges) {
-      drawPdfEdge(pdf, edge, nodesMap, t);
+      drawPdfEdge(pdf, edge, nodesMap, transform);
     }
 
     // Draw nodes on top
     for (const node of diagram.nodes) {
-      drawNodeShape(pdf, node, t);
-      drawNodeText(pdf, node, t);
+      drawNodeShape(pdf, node, transform);
+      drawNodeText(pdf, node, transform);
     }
   }
 
   // ----- Interactive links (added after all pages are built) -----
-  for (let i = 0; i < ordered.length; i++) {
-    const { diagram } = ordered[i];
+  for (let i = 0; i < pageData.length; i++) {
+    const { diagram, isRoot } = pageData[i];
     pdf.setPage(i + 1);
     const t = pageTransforms[i];
 
     // Back button link
-    const isRoot = diagram.id === project.rootDiagramId;
     if (!isRoot && parentOf[diagram.id]) {
       const parentPage = pageOf[parentOf[diagram.id]];
       if (parentPage !== undefined) {
