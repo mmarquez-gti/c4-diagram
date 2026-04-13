@@ -43,11 +43,13 @@ import type { C4Node as C4NodeData, C4Edge as C4EdgeData } from '../../lib/c4/ty
 import { getStateFromUrl, replaceStateInUrl } from '../../lib/urlState';
 import { saveToLocalStorage, loadFromLocalStorage } from '../../lib/localState';
 import C4FlowNode from './C4FlowNode';
+import CustomEdge from './CustomEdge';
 
 // ---------------------------------------------------------------------------
-// Custom node types — defined outside component to avoid ReactFlow remounting
+// Custom node / edge types — defined outside component to avoid ReactFlow remounting
 // ---------------------------------------------------------------------------
 const nodeTypes = { c4node: C4FlowNode };
+const edgeTypes = { custom: CustomEdge };
 
 // ---------------------------------------------------------------------------
 // Node type colour map
@@ -100,7 +102,15 @@ function toFlowNode(n: C4NodeData, selectedId: string | null): Node {
   };
 }
 
-function toFlowEdge(e: C4EdgeData, selectedId: string | null): Edge {
+function toFlowEdge(
+  e: C4EdgeData,
+  selectedId: string | null,
+  callbacks: {
+    onBendPointsChange: (edgeId: string, bendPoints: Array<{ x: number; y: number }>) => void;
+    onLabelOffsetYChange: (edgeId: string, offsetY: number) => void;
+    onAddBendPoint: (edgeId: string, index: number, point: { x: number; y: number }) => void;
+  },
+): Edge {
   const isSelected = selectedId === e.id;
   const strokeColor = isSelected ? '#facc15' : '#94a3b8';
   const direction = e.direction ?? 'forward';
@@ -122,6 +132,7 @@ function toFlowEdge(e: C4EdgeData, selectedId: string | null): Edge {
 
   return {
     id: e.id,
+    type: 'custom',
     source: e.source,
     target: e.target,
     sourceHandle: e.sourceHandle,
@@ -136,6 +147,15 @@ function toFlowEdge(e: C4EdgeData, selectedId: string | null): Edge {
     markerStart,
     markerEnd,
     reconnectable: isSelected,
+    data: {
+      pathMode: e.pathMode ?? 'bezier',
+      bendPoints: e.bendPoints ?? [],
+      labelOffsetY: e.labelOffsetY ?? 0,
+      isSelected,
+      onBendPointsChange: callbacks.onBendPointsChange,
+      onLabelOffsetYChange: callbacks.onLabelOffsetYChange,
+      onAddBendPoint: callbacks.onAddBendPoint,
+    },
   };
 }
 
@@ -154,6 +174,48 @@ export default function DiagramCanvas() {
   const reconnectingRef = useRef(false);
   const restoringFromUrlRef = useRef(false);
   const [reconnectingEdgeId, setReconnectingEdgeId] = useState<string | null>(null);
+
+  // -------------------------------------------------------------------------
+  // Edge data callbacks (bend points, label offset)
+  // -------------------------------------------------------------------------
+
+  const handleBendPointsChange = useCallback(
+    (edgeId: string, bendPoints: Array<{ x: number; y: number }>) => {
+      storeUpdateEdge(edgeId, { bendPoints });
+    },
+    [],
+  );
+
+  const handleLabelOffsetYChange = useCallback(
+    (edgeId: string, offsetY: number) => {
+      storeUpdateEdge(edgeId, { labelOffsetY: offsetY });
+    },
+    [],
+  );
+
+  const handleAddBendPoint = useCallback(
+    (edgeId: string, segmentIndex: number, point: { x: number; y: number }) => {
+      const proj = $project.get();
+      const diagId = $activeDiagramId.get();
+      if (!proj || !diagId) return;
+      const diag = proj.diagrams[diagId];
+      const edge = diag?.edges.find((e) => e.id === edgeId);
+      if (!edge) return;
+      const bps = [...(edge.bendPoints ?? [])];
+      bps.splice(segmentIndex, 0, point);
+      storeUpdateEdge(edgeId, { bendPoints: bps });
+    },
+    [],
+  );
+
+  const edgeCallbacks = useMemo(
+    () => ({
+      onBendPointsChange: handleBendPointsChange,
+      onLabelOffsetYChange: handleLabelOffsetYChange,
+      onAddBendPoint: handleAddBendPoint,
+    }),
+    [handleBendPointsChange, handleLabelOffsetYChange, handleAddBendPoint],
+  );
 
   useEffect(() => {
     const snapshot = getStateFromUrl();
@@ -204,7 +266,7 @@ export default function DiagramCanvas() {
   );
 
   const initialEdges = useMemo(
-    () => (diagram?.edges ?? []).map((e) => toFlowEdge(e, selectedEdgeId)),
+    () => (diagram?.edges ?? []).map((e) => toFlowEdge(e, selectedEdgeId, edgeCallbacks)),
     // Same reasoning as initialNodes above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [activeDiagramId, diagram?.id],
@@ -218,7 +280,7 @@ export default function DiagramCanvas() {
     const d = getActiveDiagram();
     setNodes((d?.nodes ?? []).map((n) => toFlowNode(n, selectedNodeId)));
     setEdges((d?.edges ?? []).map((e) => {
-      const flowEdge = toFlowEdge(e, selectedEdgeId);
+      const flowEdge = toFlowEdge(e, selectedEdgeId, edgeCallbacks);
       flowEdge.reconnectable = selectedEdgeId === e.id || reconnectingEdgeId === e.id;
       return flowEdge;
     }));
@@ -235,7 +297,7 @@ export default function DiagramCanvas() {
     const d = getActiveDiagram();
     setNodes((d?.nodes ?? []).map((n) => toFlowNode(n, selectedNodeId)));
     setEdges((d?.edges ?? []).map((e) => {
-      const flowEdge = toFlowEdge(e, selectedEdgeId);
+      const flowEdge = toFlowEdge(e, selectedEdgeId, edgeCallbacks);
       flowEdge.reconnectable = selectedEdgeId === e.id || reconnectingEdgeId === e.id;
       return flowEdge;
     }));
@@ -277,6 +339,8 @@ export default function DiagramCanvas() {
           markerEnd = marker;
         }
 
+        const c4Edge = diagram?.edges.find((edge) => edge.id === e.id);
+
         return {
           ...e,
           style: {
@@ -286,6 +350,16 @@ export default function DiagramCanvas() {
           markerStart,
           markerEnd,
           reconnectable: selectedEdgeId === e.id || reconnectingEdgeId === e.id,
+          data: {
+            ...(e.data ?? {}),
+            pathMode: c4Edge?.pathMode ?? 'bezier',
+            bendPoints: c4Edge?.bendPoints ?? [],
+            labelOffsetY: c4Edge?.labelOffsetY ?? 0,
+            isSelected: selectedEdgeId === e.id,
+            onBendPointsChange: edgeCallbacks.onBendPointsChange,
+            onLabelOffsetYChange: edgeCallbacks.onLabelOffsetYChange,
+            onAddBendPoint: edgeCallbacks.onAddBendPoint,
+          },
         };
       }),
     );
@@ -442,6 +516,8 @@ export default function DiagramCanvas() {
         edgesReconnectable
         nodesConnectable={!selectedEdgeId}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        defaultEdgeOptions={{ type: 'custom' }}
         fitView
         deleteKeyCode="Delete"
         colorMode="dark"

@@ -4,7 +4,7 @@ import { useStore } from '@nanostores/react';
 import { $project, $activeDiagramId, updateNode, updateEdge, enterSubdiagram } from '../../stores/diagramStore';
 import { $selectedNodeId, $selectedEdgeId, clearSelection } from '../../stores/selectionStore';
 import { $rightPanelOpen } from '../../stores/uiStore';
-import type { C4EdgeDirection, C4NodeType } from '../../lib/c4/types';
+import type { C4EdgeDirection, C4EdgePathMode, C4NodeType } from '../../lib/c4/types';
 
 const NODE_TYPES: C4NodeType[] = [
   'Person',
@@ -21,6 +21,12 @@ const EDGE_DIRECTIONS: Array<{ value: C4EdgeDirection; label: string }> = [
   { value: 'reverse', label: 'Target -> Source' },
   { value: 'bidirectional', label: 'Bidirectional' },
   { value: 'none', label: 'No arrows' },
+];
+
+const EDGE_PATH_MODES: Array<{ value: C4EdgePathMode; label: string; icon: string }> = [
+  { value: 'bezier', label: 'Curved', icon: '⌒' },
+  { value: 'straight', label: 'Straight', icon: '⟋' },
+  { value: 'orthogonal', label: 'Orthogonal', icon: '⌐' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -172,6 +178,29 @@ export default function PropertiesPanel() {
                 {selectedEdge.target}
               </p>
 
+              {/* Path mode selector */}
+              <div className="flex flex-col gap-1.5">
+                <span className={labelClass}>Path Mode</span>
+                <div className="flex gap-1">
+                  {EDGE_PATH_MODES.map((mode) => (
+                    <button
+                      key={mode.value}
+                      className={`flex-1 text-xs px-2 py-1.5 rounded border transition-colors ${
+                        (selectedEdge.pathMode ?? 'bezier') === mode.value
+                          ? 'bg-indigo-600/30 border-indigo-500 text-indigo-200'
+                          : 'bg-[#131826] border-[#1e2a42] text-[#4a5a72] hover:border-[#2a3a52] hover:text-[#8b9ab0]'
+                      }`}
+                      onClick={() => updateEdge(selectedEdge.id, { pathMode: mode.value })}
+                      title={mode.label}
+                      aria-label={`${mode.label} path mode`}
+                    >
+                      <span className="mr-1">{mode.icon}</span>
+                      {mode.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <label className="flex flex-col gap-1.5">
                 <span className={labelClass}>Direction</span>
                 <select
@@ -202,6 +231,52 @@ export default function PropertiesPanel() {
                   onChange={(e) => updateEdge(selectedEdge.id, { technology: e.target.value || undefined })}
                 />
               </label>
+
+              {/* Label vertical offset */}
+              <label className="flex flex-col gap-1.5">
+                <span className={labelClass}>Label Offset Y</span>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min={-200}
+                    max={200}
+                    step={1}
+                    className="flex-1 accent-indigo-500"
+                    value={selectedEdge.labelOffsetY ?? 0}
+                    onChange={(e) => updateEdge(selectedEdge.id, { labelOffsetY: Number(e.target.value) || 0 })}
+                  />
+                  <span className="text-[10px] text-[#4a5a72] w-8 text-right">
+                    {selectedEdge.labelOffsetY ?? 0}
+                  </span>
+                  {(selectedEdge.labelOffsetY ?? 0) !== 0 && (
+                    <button
+                      className="text-[10px] text-[#4a5a72] hover:text-[#8b9ab0]"
+                      onClick={() => updateEdge(selectedEdge.id, { labelOffsetY: 0 })}
+                      title="Reset offset"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </label>
+
+              {/* Bend points info & controls */}
+              <div className="flex flex-col gap-1.5">
+                <span className={labelClass}>
+                  Bend Points ({(selectedEdge.bendPoints ?? []).length})
+                </span>
+                <p className="text-[10px] text-[#3a4a62] leading-tight">
+                  Double-click on the edge to add a bend point. Double-click a point to remove it. Drag to reposition.
+                </p>
+                {(selectedEdge.bendPoints ?? []).length > 0 && (
+                  <button
+                    className="text-xs px-2 py-1 rounded bg-red-600/20 hover:bg-red-600/40 border border-red-600/30 text-red-300 hover:text-red-200 transition-colors"
+                    onClick={() => updateEdge(selectedEdge.id, { bendPoints: [] })}
+                  >
+                    Clear All Bend Points
+                  </button>
+                )}
+              </div>
             </>
           )}
         </div>

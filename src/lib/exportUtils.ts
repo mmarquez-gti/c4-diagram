@@ -232,31 +232,96 @@ function drawPdfEdge(
   const from = getHandlePosition(src, edge.sourceHandle, true);
   const to = getHandlePosition(tgt, edge.targetHandle, false);
 
-  const x1 = px(from.x, t);
-  const y1 = py(from.y, t);
-  const x2 = px(to.x, t);
-  const y2 = py(to.y, t);
+  const pathMode = edge.pathMode ?? 'bezier';
+  const bendPoints = edge.bendPoints ?? [];
+  const labelOffsetY = edge.labelOffsetY ?? 0;
 
-  // Line
+  // Build full point list: source -> bendPoints -> target
+  const validBendPoints = bendPoints.filter(
+    (bp): bp is { x: number; y: number } =>
+      bp != null && typeof bp.x === 'number' && typeof bp.y === 'number',
+  );
+  const allPoints = [
+    { x: px(from.x, t), y: py(from.y, t) },
+    ...validBendPoints.map((bp) => ({ x: px(bp.x, t), y: py(bp.y, t) })),
+    { x: px(to.x, t), y: py(to.y, t) },
+  ];
+
+  // Draw edge line(s)
   pdf.setDrawColor(...EDGE_STROKE);
   pdf.setLineWidth(0.8);
   pdf.setLineDashPattern([], 0);
-  pdf.line(x1, y1, x2, y2);
 
-  // Arrowheads
+  if (pathMode === 'orthogonal') {
+    // Draw orthogonal segments
+    for (let i = 0; i < allPoints.length - 1; i++) {
+      const a = allPoints[i];
+      const b = allPoints[i + 1];
+      // Horizontal then vertical
+      pdf.line(a.x, a.y, b.x, a.y);
+      pdf.line(b.x, a.y, b.x, b.y);
+    }
+  } else {
+    // Straight or bezier — draw as line segments through points
+    // (For PDF, we use straight line segments; true bezier curves would require
+    // lower-level PDF path commands which jsPDF doesn't easily expose.)
+    for (let i = 0; i < allPoints.length - 1; i++) {
+      pdf.line(allPoints[i].x, allPoints[i].y, allPoints[i + 1].x, allPoints[i + 1].y);
+    }
+  }
+
+  // Arrowheads — use the first/last segments for direction
   const dir = edge.direction ?? 'forward';
   pdf.setFillColor(...EDGE_STROKE);
+
+  const firstPt = allPoints[0];
+  const secondPt = allPoints[1];
+  const lastPt = allPoints[allPoints.length - 1];
+  const secondLastPt = allPoints[allPoints.length - 2];
+
   if (dir === 'forward' || dir === 'bidirectional') {
-    drawArrowhead(pdf, x2, y2, x1, y1);
+    drawArrowhead(pdf, lastPt.x, lastPt.y, secondLastPt.x, secondLastPt.y);
   }
   if (dir === 'reverse' || dir === 'bidirectional') {
-    drawArrowhead(pdf, x1, y1, x2, y2);
+    drawArrowhead(pdf, firstPt.x, firstPt.y, secondPt.x, secondPt.y);
   }
 
-  // Label
+  // Label — positioned at midpoint of the path + labelOffsetY
   if (edge.label) {
-    const mx = (x1 + x2) / 2;
-    const my = (y1 + y2) / 2;
+    let mx: number;
+    let my: number;
+
+    if (allPoints.length === 2) {
+      mx = (allPoints[0].x + allPoints[1].x) / 2;
+      my = (allPoints[0].y + allPoints[1].y) / 2;
+    } else {
+      // Find midpoint by total path length
+      let totalLen = 0;
+      const segLens: number[] = [];
+      for (let i = 1; i < allPoints.length; i++) {
+        const dx = allPoints[i].x - allPoints[i - 1].x;
+        const dy = allPoints[i].y - allPoints[i - 1].y;
+        const len = Math.sqrt(dx * dx + dy * dy);
+        segLens.push(len);
+        totalLen += len;
+      }
+      const halfLen = totalLen / 2;
+      let walked = 0;
+      mx = allPoints[allPoints.length - 1].x;
+      my = allPoints[allPoints.length - 1].y;
+      for (let i = 0; i < segLens.length; i++) {
+        if (walked + segLens[i] >= halfLen) {
+          const frac = (halfLen - walked) / segLens[i];
+          mx = allPoints[i].x + (allPoints[i + 1].x - allPoints[i].x) * frac;
+          my = allPoints[i].y + (allPoints[i + 1].y - allPoints[i].y) * frac;
+          break;
+        }
+        walked += segLens[i];
+      }
+    }
+
+    my += ps(labelOffsetY, t);
+
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(8);
     const tw = pdf.getTextWidth(edge.label);
