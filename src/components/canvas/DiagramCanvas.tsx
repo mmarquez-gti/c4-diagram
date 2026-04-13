@@ -12,6 +12,7 @@ import {
   reconnectEdge,
   useNodesState,
   useEdgesState,
+  useReactFlow,
   type Connection,
   type NodeChange,
   type EdgeChange,
@@ -158,6 +159,23 @@ function toFlowEdge(
       onAddBendPoint: callbacks.onAddBendPoint,
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// Inner component: re-fits the view whenever the active diagram changes
+// ---------------------------------------------------------------------------
+
+function FitViewOnDiagramChange({ activeDiagramId }: { activeDiagramId: string | null }) {
+  const { fitView } = useReactFlow();
+  useEffect(() => {
+    if (!activeDiagramId) return;
+    const timer = setTimeout(() => {
+      fitView({ padding: 0.1 });
+    }, 50);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeDiagramId]);
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -527,6 +545,7 @@ export default function DiagramCanvas() {
         <Background variant={BackgroundVariant.Dots} gap={24} color="#374151" />
         <Controls />
         <MiniMap nodeColor={(n) => (NODE_COLORS[(n.data as { nodeType?: string })?.nodeType ?? ''] ?? '#374151')} />
+        <FitViewOnDiagramChange activeDiagramId={activeDiagramId} />
       </ReactFlow>
     </div>
   );
