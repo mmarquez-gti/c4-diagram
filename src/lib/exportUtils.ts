@@ -85,6 +85,12 @@ const NODE_COLORS: Record<string, RGB> = {
 const EDGE_STROKE: RGB = [148, 163, 184];
 const EDGE_LABEL_BG: RGB = [30, 41, 59];
 
+/** Arrowhead half-angle (radians from the shaft) — controls how "open" the arrow tip is. */
+const ARROW_HALF_ANGLE = Math.PI * 0.82;
+
+/** Vertical positions (fraction of node height) for UML Component port tabs. */
+const COMPONENT_TAB_POSITIONS = [0.28, 0.52];
+
 // ---------------------------------------------------------------------------
 // Coordinate transform helpers
 // ---------------------------------------------------------------------------
@@ -200,8 +206,8 @@ function drawArrowhead(
   size = 5,
 ): void {
   const angle = Math.atan2(tipY - fromY, tipX - fromX);
-  const a1 = angle + Math.PI * 0.82;
-  const a2 = angle - Math.PI * 0.82;
+  const a1 = angle + ARROW_HALF_ANGLE;
+  const a2 = angle - ARROW_HALF_ANGLE;
   pdf.triangle(
     tipX,
     tipY,
@@ -360,7 +366,7 @@ function drawNodeShape(pdf: jsPDF, node: C4Node, t: PdfTransform): void {
       // UML port tabs on the right
       const tabW = Math.max(4, 6 * t.scale);
       const tabH = Math.max(3, 5 * t.scale);
-      for (const pct of [0.28, 0.52]) {
+      for (const pct of COMPONENT_TAB_POSITIONS) {
         const tabY = y + h * pct;
         pdf.setFillColor(...color);
         pdf.rect(x + w - 1, tabY, tabW, tabH, 'F');
