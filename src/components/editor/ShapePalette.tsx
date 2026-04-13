@@ -106,6 +106,29 @@ const SHAPES: ShapeDef[] = [
       </svg>
     ),
   },
+  {
+    type: 'TextLabel',
+    label: 'Text Label',
+    description: 'Free-floating text annotation',
+    color: '#94a3b8',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-full h-full">
+        <path strokeLinecap="round" d="M4 7h16M4 12h10M4 17h7" />
+      </svg>
+    ),
+  },
+  {
+    type: 'GroupBox',
+    label: 'Group Box',
+    description: 'Visual grouping box',
+    color: '#6366f1',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeDasharray="4 2" className="w-full h-full">
+        <rect x="3" y="3" width="18" height="18" rx="2" />
+        <path strokeDasharray="none" d="M3 9h18" />
+      </svg>
+    ),
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -129,7 +152,16 @@ export default function ShapePalette() {
     if (!project) {
       createProject();
     }
-    addNode({ type, label: type, x: NODE_PLACE_MIN_X + Math.random() * NODE_PLACE_MAX_X_OFFSET, y: NODE_PLACE_MIN_Y + Math.random() * NODE_PLACE_MAX_Y_OFFSET });
+    const isTextLabel = type === 'TextLabel';
+    const isGroupBox = type === 'GroupBox';
+    addNode({
+      type,
+      label: isTextLabel ? 'Label' : isGroupBox ? 'Group' : type,
+      x: NODE_PLACE_MIN_X + Math.random() * NODE_PLACE_MAX_X_OFFSET,
+      y: NODE_PLACE_MIN_Y + Math.random() * NODE_PLACE_MAX_Y_OFFSET,
+      width: isTextLabel ? 180 : isGroupBox ? 300 : undefined,
+      height: isTextLabel ? 50 : isGroupBox ? 200 : undefined,
+    });
   };
 
   return (

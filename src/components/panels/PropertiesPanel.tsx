@@ -14,6 +14,8 @@ const NODE_TYPES: C4NodeType[] = [
   'Container',
   'ContainerDb',
   'Component',
+  'TextLabel',
+  'GroupBox',
 ];
 
 const EDGE_DIRECTIONS: Array<{ value: C4EdgeDirection; label: string }> = [
@@ -143,24 +145,55 @@ export default function PropertiesPanel() {
                 />
               </label>
 
-              <label className="flex flex-col gap-1.5">
-                <span className={labelClass}>Technology</span>
-                <input
-                  className={inputClass}
-                  value={selectedNode.technology ?? ''}
-                  onChange={(e) => updateNode(selectedNode.id, { technology: e.target.value || undefined })}
-                />
-              </label>
+              {selectedNode.type !== 'TextLabel' && selectedNode.type !== 'GroupBox' && (
+                <label className="flex flex-col gap-1.5">
+                  <span className={labelClass}>Technology</span>
+                  <input
+                    className={inputClass}
+                    value={selectedNode.technology ?? ''}
+                    onChange={(e) => updateNode(selectedNode.id, { technology: e.target.value || undefined })}
+                  />
+                </label>
+              )}
 
-              <div className="mt-auto pt-3 border-t border-[#1a2035]">
-                <button
-                  className="w-full text-xs px-2 py-2 rounded bg-indigo-600/20 hover:bg-indigo-600/40 border border-indigo-600/30 text-indigo-300 hover:text-indigo-200 transition-colors whitespace-nowrap"
-                  onClick={() => enterSubdiagram(selectedNode.id)}
-                  title="Drill into this node's sub-diagram"
-                >
-                  ↳ Enter Sub-diagram
-                </button>
-              </div>
+              {(selectedNode.type === 'TextLabel' || selectedNode.type === 'GroupBox') && (
+                <div className="flex flex-col gap-1.5">
+                  <span className={labelClass}>Color</span>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={selectedNode.color ?? (selectedNode.type === 'GroupBox' ? '#6366f1' : '#e2e8f0')}
+                      onChange={(e) => updateNode(selectedNode.id, { color: e.target.value })}
+                      className="w-8 h-8 rounded cursor-pointer border border-[#1e2a42] bg-transparent"
+                      title="Pick color"
+                    />
+                    <span className="text-[11px] text-[#4a5a72] font-mono">
+                      {selectedNode.color ?? (selectedNode.type === 'GroupBox' ? '#6366f1' : '#e2e8f0')}
+                    </span>
+                    {selectedNode.color && (
+                      <button
+                        onClick={() => updateNode(selectedNode.id, { color: undefined })}
+                        className="text-[10px] text-[#4a5a72] hover:text-[#8b9ab0] transition-colors"
+                        title="Reset to default"
+                      >
+                        ↺
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {selectedNode.type !== 'TextLabel' && selectedNode.type !== 'GroupBox' && (
+                <div className="mt-auto pt-3 border-t border-[#1a2035]">
+                  <button
+                    className="w-full text-xs px-2 py-2 rounded bg-indigo-600/20 hover:bg-indigo-600/40 border border-indigo-600/30 text-indigo-300 hover:text-indigo-200 transition-colors whitespace-nowrap"
+                    onClick={() => enterSubdiagram(selectedNode.id)}
+                    title="Drill into this node's sub-diagram"
+                  >
+                    ↳ Enter Sub-diagram
+                  </button>
+                </div>
+              )}
             </>
           )}
 

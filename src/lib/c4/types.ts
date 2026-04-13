@@ -9,7 +9,11 @@ export type C4NodeType =
   | 'Boundary'
   | 'Container'
   | 'ContainerDb'
-  | 'Component';
+  | 'Component'
+  /** Free-floating text annotation — no connection handles */
+  | 'TextLabel'
+  /** Visual grouping box placed behind other nodes */
+  | 'GroupBox';
 
 export interface C4Position {
   x: number;
@@ -26,6 +30,8 @@ export interface C4Node {
   size: { width: number; height: number };
   /** Reference to a nested sub-diagram (drill-down), max depth 10 */
   childDiagramId?: string;
+  /** Custom accent color (hex). Used by TextLabel and GroupBox; optional for other types. */
+  color?: string;
 }
 
 export type C4EdgeDirection = 'forward' | 'reverse' | 'bidirectional' | 'none';
