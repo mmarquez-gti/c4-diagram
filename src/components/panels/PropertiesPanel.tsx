@@ -1,10 +1,10 @@
 'use client';
 
 import { useStore } from '@nanostores/react';
-import { $project, $activeDiagramId, updateNode, updateEdge, updateAnnotation, updateGroupBox, enterSubdiagram } from '../../stores/diagramStore';
+import { $project, $activeDiagramId, updateNode, updateEdge, enterSubdiagram } from '../../stores/diagramStore';
 import { $selectedNodeId, $selectedEdgeId, clearSelection } from '../../stores/selectionStore';
 import { $rightPanelOpen } from '../../stores/uiStore';
-import type { C4EdgeDirection, C4EdgePathMode, C4GroupBoxBorderStyle, C4NodeType } from '../../lib/c4/types';
+import type { C4EdgeDirection, C4EdgePathMode, C4NodeType } from '../../lib/c4/types';
 
 const NODE_TYPES: C4NodeType[] = [
   'Person',
@@ -52,12 +52,6 @@ export default function PropertiesPanel() {
   const diagram = project && activeDiagramId ? project.diagrams[activeDiagramId] : null;
   const selectedNode = diagram?.nodes.find((n) => n.id === selectedNodeId) ?? null;
   const selectedEdge = diagram?.edges.find((e) => e.id === selectedEdgeId) ?? null;
-  const selectedAnnotation = selectedNodeId
-    ? (diagram?.annotations ?? []).find((a) => a.id === selectedNodeId) ?? null
-    : null;
-  const selectedGroupBox = selectedNodeId
-    ? (diagram?.groupBoxes ?? []).find((g) => g.id === selectedNodeId) ?? null
-    : null;
 
   return (
     <div
@@ -109,7 +103,7 @@ export default function PropertiesPanel() {
       {/* Content — only visible when open */}
       {open && (
         <div className="flex flex-col gap-4 p-3 overflow-y-auto flex-1 min-w-0">
-          {!selectedNode && !selectedAnnotation && !selectedGroupBox && !selectedEdge && (
+          {!selectedNode && !selectedEdge && (
             <p className="text-xs text-[#2a3a52] italic mt-2 whitespace-nowrap">
               Select a node or edge
             </p>
@@ -167,158 +161,6 @@ export default function PropertiesPanel() {
                   ↳ Enter Sub-diagram
                 </button>
               </div>
-            </>
-          )}
-
-          {selectedAnnotation && (
-            <>
-              <p className="text-[10px] text-[#4a5a72] uppercase tracking-wider font-semibold">Text Annotation</p>
-
-              <label className="flex flex-col gap-1.5">
-                <span className={labelClass}>Text</span>
-                <textarea
-                  className={`${inputClass} resize-none`}
-                  rows={4}
-                  value={selectedAnnotation.text}
-                  onChange={(e) => updateAnnotation(selectedAnnotation.id, { text: e.target.value })}
-                />
-              </label>
-
-              <label className="flex flex-col gap-1.5">
-                <span className={labelClass}>Colour</span>
-                <div className="flex gap-2 items-center">
-                  <input
-                    type="color"
-                    className="w-8 h-7 rounded border border-[#1e2a42] bg-[#131826] cursor-pointer p-0.5"
-                    value={selectedAnnotation.color ?? '#94a3b8'}
-                    onChange={(e) => updateAnnotation(selectedAnnotation.id, { color: e.target.value })}
-                  />
-                  <input
-                    className={`${inputClass} flex-1`}
-                    value={selectedAnnotation.color ?? '#94a3b8'}
-                    onChange={(e) => updateAnnotation(selectedAnnotation.id, { color: e.target.value })}
-                  />
-                </div>
-              </label>
-
-              <label className="flex flex-col gap-1.5">
-                <span className={labelClass}>Font Size</span>
-                <input
-                  type="number"
-                  min={8}
-                  max={72}
-                  className={inputClass}
-                  value={selectedAnnotation.fontSize ?? 13}
-                  onChange={(e) => updateAnnotation(selectedAnnotation.id, { fontSize: Number(e.target.value) })}
-                />
-              </label>
-
-              <div className="flex flex-col gap-1.5">
-                <span className={labelClass}>Style</span>
-                <div className="flex gap-2">
-                  <button
-                    className={`flex-1 text-xs px-2 py-1.5 rounded border transition-colors font-bold ${
-                      selectedAnnotation.fontWeight === 'bold'
-                        ? 'bg-indigo-600/30 border-indigo-500 text-indigo-200'
-                        : 'bg-[#131826] border-[#1e2a42] text-[#4a5a72] hover:border-[#2a3a52] hover:text-[#8b9ab0]'
-                    }`}
-                    onClick={() =>
-                      updateAnnotation(selectedAnnotation.id, {
-                        fontWeight: selectedAnnotation.fontWeight === 'bold' ? 'normal' : 'bold',
-                      })
-                    }
-                  >
-                    B
-                  </button>
-                  <button
-                    className={`flex-1 text-xs px-2 py-1.5 rounded border transition-colors italic ${
-                      selectedAnnotation.fontStyle === 'italic'
-                        ? 'bg-indigo-600/30 border-indigo-500 text-indigo-200'
-                        : 'bg-[#131826] border-[#1e2a42] text-[#4a5a72] hover:border-[#2a3a52] hover:text-[#8b9ab0]'
-                    }`}
-                    onClick={() =>
-                      updateAnnotation(selectedAnnotation.id, {
-                        fontStyle: selectedAnnotation.fontStyle === 'italic' ? 'normal' : 'italic',
-                      })
-                    }
-                  >
-                    I
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-
-          {selectedGroupBox && (
-            <>
-              <p className="text-[10px] text-[#4a5a72] uppercase tracking-wider font-semibold">Group Box</p>
-
-              <label className="flex flex-col gap-1.5">
-                <span className={labelClass}>Label</span>
-                <input
-                  className={inputClass}
-                  value={selectedGroupBox.label ?? ''}
-                  onChange={(e) => updateGroupBox(selectedGroupBox.id, { label: e.target.value || undefined })}
-                />
-              </label>
-
-              <label className="flex flex-col gap-1.5">
-                <span className={labelClass}>Border Colour</span>
-                <div className="flex gap-2 items-center">
-                  <input
-                    type="color"
-                    className="w-8 h-7 rounded border border-[#1e2a42] bg-[#131826] cursor-pointer p-0.5"
-                    value={selectedGroupBox.borderColor ?? '#6366f1'}
-                    onChange={(e) => updateGroupBox(selectedGroupBox.id, { borderColor: e.target.value })}
-                  />
-                  <input
-                    className={`${inputClass} flex-1`}
-                    value={selectedGroupBox.borderColor ?? '#6366f1'}
-                    onChange={(e) => updateGroupBox(selectedGroupBox.id, { borderColor: e.target.value })}
-                  />
-                </div>
-              </label>
-
-              <label className="flex flex-col gap-1.5">
-                <span className={labelClass}>Fill Colour</span>
-                <input
-                  className={inputClass}
-                  placeholder="e.g. rgba(99,102,241,0.08)"
-                  value={selectedGroupBox.fillColor ?? 'rgba(99,102,241,0.08)'}
-                  onChange={(e) => updateGroupBox(selectedGroupBox.id, { fillColor: e.target.value })}
-                />
-              </label>
-
-              <div className="flex flex-col gap-1.5">
-                <span className={labelClass}>Border Style</span>
-                <div className="flex flex-col gap-1">
-                  {(['dashed', 'solid', 'dotted'] as C4GroupBoxBorderStyle[]).map((style) => (
-                    <button
-                      key={style}
-                      className={`text-xs px-2 py-1.5 rounded border transition-colors capitalize ${
-                        (selectedGroupBox.borderStyle ?? 'dashed') === style
-                          ? 'bg-indigo-600/30 border-indigo-500 text-indigo-200'
-                          : 'bg-[#131826] border-[#1e2a42] text-[#4a5a72] hover:border-[#2a3a52] hover:text-[#8b9ab0]'
-                      }`}
-                      onClick={() => updateGroupBox(selectedGroupBox.id, { borderStyle: style })}
-                    >
-                      {style}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <label className="flex flex-col gap-1.5">
-                <span className={labelClass}>Label Font Size</span>
-                <input
-                  type="number"
-                  min={8}
-                  max={36}
-                  className={inputClass}
-                  value={selectedGroupBox.fontSize ?? 12}
-                  onChange={(e) => updateGroupBox(selectedGroupBox.id, { fontSize: Number(e.target.value) })}
-                />
-              </label>
             </>
           )}
 

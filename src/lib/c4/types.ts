@@ -69,43 +69,6 @@ export interface C4Edge {
   labelOffsetY?: number;
 }
 
-// ---------------------------------------------------------------------------
-// Visual-only annotation (free text label)
-// ---------------------------------------------------------------------------
-
-export interface C4Annotation {
-  id: string;
-  text: string;
-  position: C4Position;
-  size: { width: number; height: number };
-  /** Font size in px (default 13) */
-  fontSize?: number;
-  /** CSS colour string (default '#94a3b8') */
-  color?: string;
-  fontWeight?: 'normal' | 'bold';
-  fontStyle?: 'normal' | 'italic';
-}
-
-// ---------------------------------------------------------------------------
-// Visual-only group box (semi-transparent rectangle to group elements)
-// ---------------------------------------------------------------------------
-
-export type C4GroupBoxBorderStyle = 'solid' | 'dashed' | 'dotted';
-
-export interface C4GroupBox {
-  id: string;
-  label?: string;
-  position: C4Position;
-  size: { width: number; height: number };
-  /** Border colour (default '#6366f1') */
-  borderColor?: string;
-  /** Fill colour including opacity, e.g. 'rgba(99,102,241,0.08)' */
-  fillColor?: string;
-  borderStyle?: C4GroupBoxBorderStyle;
-  /** Label font size in px (default 12) */
-  fontSize?: number;
-}
-
 export interface C4Diagram {
   id: string;
   level: C4Level;
@@ -116,10 +79,6 @@ export interface C4Diagram {
   title: string;
   nodes: C4Node[];
   edges: C4Edge[];
-  /** Visual-only free text annotations */
-  annotations?: C4Annotation[];
-  /** Visual-only grouping boxes */
-  groupBoxes?: C4GroupBox[];
   /** Cached Mermaid serialisation — regenerated on save */
   mermaidCache?: string;
   createdAt: string;
