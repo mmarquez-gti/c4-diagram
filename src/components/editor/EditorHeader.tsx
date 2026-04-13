@@ -133,6 +133,8 @@ export default function EditorHeader() {
   const leftOpen = useStore($leftPanelOpen);
   const rightOpen = useStore($rightPanelOpen);
 
+  const [exportingPdf, setExportingPdf] = useState(false);
+
   const canUndo = history.past.length > 0;
   const canRedo = history.future.length > 0;
   const canGoBack = navigationStack.length > 1;
@@ -171,12 +173,15 @@ export default function EditorHeader() {
     }
   };
 
-  const handleExportPdf = () => {
-    if (!project) return;
+  const handleExportPdf = async () => {
+    if (!project || exportingPdf) return;
+    setExportingPdf(true);
     try {
-      exportProjectToPdf(project, project.name);
+      await exportProjectToPdf(project, project.name);
     } catch {
       alert('Failed to export PDF. Please try again.');
+    } finally {
+      setExportingPdf(false);
     }
   };
 
@@ -196,7 +201,7 @@ export default function EditorHeader() {
     { label: 'Import .c4m…', onClick: handleImport },
     { separator: true },
     { label: 'Export current layer as PNG', onClick: handleExportPng, disabled: !project || !activeDiagramId },
-    { label: 'Export all as interactive PDF', onClick: handleExportPdf, disabled: !project },
+    { label: exportingPdf ? 'Exporting PDF…' : 'Export all as interactive PDF', onClick: handleExportPdf, disabled: !project || exportingPdf },
     { separator: true },
     { label: 'Export as Mermaid', onClick: handleExportMermaid, disabled: !project },
     { label: 'Export as .c4m', onClick: handleExportJson, disabled: !project },
