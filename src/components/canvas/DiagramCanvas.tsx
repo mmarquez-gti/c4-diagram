@@ -82,6 +82,9 @@ function toFlowNode(n: C4NodeData, selectedId: string | null): Node {
     position: n.position,
     width: n.size.width,
     height: n.size.height,
+    // Setting measured prevents ReactFlow from resetting handleBounds to undefined
+    // on every setNodes call, which would cause edges to disappear until the
+    // ResizeObserver fires again.
     measured: { width: n.size.width, height: n.size.height },
     zIndex: n.type === 'GroupBox' ? -1 : 0,
     data: {
