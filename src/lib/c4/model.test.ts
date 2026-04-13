@@ -90,10 +90,16 @@ describe('createEdge', () => {
     expect(edge.labelOffsetY).toBe(42);
   });
 
+  it('stores labelOffsetX', () => {
+    const edge = createEdge({ source: 'a', target: 'b', labelOffsetX: -15 });
+    expect(edge.labelOffsetX).toBe(-15);
+  });
+
   it('defaults new fields to undefined when not provided', () => {
     const edge = createEdge({ source: 'a', target: 'b' });
     expect(edge.pathMode).toBeUndefined();
     expect(edge.bendPoints).toBeUndefined();
+    expect(edge.labelOffsetX).toBeUndefined();
     expect(edge.labelOffsetY).toBeUndefined();
   });
 });
@@ -229,6 +235,14 @@ describe('addEdgeToDiagram / removeEdgeFromDiagram / updateEdgeInDiagram', () =>
     d = addEdgeToDiagram(d, edge);
     d = updateEdgeInDiagram(d, edge.id, { labelOffsetY: -30 });
     expect(d.edges[0].labelOffsetY).toBe(-30);
+  });
+
+  it('updates labelOffsetX on an edge', () => {
+    let d = createDiagram();
+    const edge = createEdge({ source: 'a', target: 'b' });
+    d = addEdgeToDiagram(d, edge);
+    d = updateEdgeInDiagram(d, edge.id, { labelOffsetX: 25 });
+    expect(d.edges[0].labelOffsetX).toBe(25);
   });
 });
 

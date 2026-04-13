@@ -58,6 +58,11 @@ export interface C4Edge {
   /** Intermediate bend/waypoints — the edge path passes through these in order. */
   bendPoints?: C4BendPoint[];
   /**
+   * Horizontal offset (in px) of the label from its default midpoint position.
+   * Positive values push the label rightward.
+   */
+  labelOffsetX?: number;
+  /**
    * Vertical offset (in px) of the label from its default midpoint position.
    * Positive values push the label downward.
    */

@@ -63,6 +63,7 @@ export interface CreateEdgeOptions {
   technology?: string;
   pathMode?: C4Edge['pathMode'];
   bendPoints?: C4Edge['bendPoints'];
+  labelOffsetX?: number;
   labelOffsetY?: number;
 }
 
@@ -78,6 +79,7 @@ export function createEdge(options: CreateEdgeOptions): C4Edge {
     technology: options.technology,
     pathMode: options.pathMode,
     bendPoints: options.bendPoints,
+    labelOffsetX: options.labelOffsetX,
     labelOffsetY: options.labelOffsetY,
   };
 }

@@ -181,11 +181,11 @@ export default function PropertiesPanel() {
               {/* Path mode selector */}
               <div className="flex flex-col gap-1.5">
                 <span className={labelClass}>Path Mode</span>
-                <div className="flex gap-1">
+                <div className="flex flex-col gap-1">
                   {EDGE_PATH_MODES.map((mode) => (
                     <button
                       key={mode.value}
-                      className={`flex-1 text-xs px-2 py-1.5 rounded border transition-colors ${
+                      className={`flex items-center gap-2 text-xs px-2 py-1.5 rounded border transition-colors ${
                         (selectedEdge.pathMode ?? 'bezier') === mode.value
                           ? 'bg-indigo-600/30 border-indigo-500 text-indigo-200'
                           : 'bg-[#131826] border-[#1e2a42] text-[#4a5a72] hover:border-[#2a3a52] hover:text-[#8b9ab0]'
@@ -194,8 +194,8 @@ export default function PropertiesPanel() {
                       title={mode.label}
                       aria-label={`${mode.label} path mode`}
                     >
-                      <span className="mr-1">{mode.icon}</span>
-                      {mode.label}
+                      <span>{mode.icon}</span>
+                      <span>{mode.label}</span>
                     </button>
                   ))}
                 </div>
@@ -232,33 +232,19 @@ export default function PropertiesPanel() {
                 />
               </label>
 
-              {/* Label vertical offset */}
-              <label className="flex flex-col gap-1.5">
-                <span className={labelClass}>Label Offset Y</span>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="range"
-                    min={-200}
-                    max={200}
-                    step={1}
-                    className="flex-1 accent-indigo-500"
-                    value={selectedEdge.labelOffsetY ?? 0}
-                    onChange={(e) => updateEdge(selectedEdge.id, { labelOffsetY: Number(e.target.value) || 0 })}
-                  />
-                  <span className="text-[10px] text-[#4a5a72] w-8 text-right">
-                    {selectedEdge.labelOffsetY ?? 0}
-                  </span>
-                  {(selectedEdge.labelOffsetY ?? 0) !== 0 && (
-                    <button
-                      className="text-[10px] text-[#4a5a72] hover:text-[#8b9ab0]"
-                      onClick={() => updateEdge(selectedEdge.id, { labelOffsetY: 0 })}
-                      title="Reset offset"
-                    >
-                      ✕
-                    </button>
-                  )}
+              {/* Label offset reset */}
+              {((selectedEdge.labelOffsetX ?? 0) !== 0 || (selectedEdge.labelOffsetY ?? 0) !== 0) && (
+                <div className="flex flex-col gap-1.5">
+                  <span className={labelClass}>Label Position</span>
+                  <button
+                    className="text-xs px-2 py-1 rounded bg-[#131826] hover:bg-[#1a2230] border border-[#1e2a42] text-[#4a5a72] hover:text-[#8b9ab0] transition-colors"
+                    onClick={() => updateEdge(selectedEdge.id, { labelOffsetX: 0, labelOffsetY: 0 })}
+                    title="Reset label to default position"
+                  >
+                    ↺ Reset label position
+                  </button>
                 </div>
-              </label>
+              )}
 
               {/* Bend points info & controls */}
               <div className="flex flex-col gap-1.5">

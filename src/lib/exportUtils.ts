@@ -234,6 +234,7 @@ function drawPdfEdge(
 
   const pathMode = edge.pathMode ?? 'bezier';
   const bendPoints = edge.bendPoints ?? [];
+  const labelOffsetX = edge.labelOffsetX ?? 0;
   const labelOffsetY = edge.labelOffsetY ?? 0;
 
   // Build full point list: source -> bendPoints -> target
@@ -321,6 +322,7 @@ function drawPdfEdge(
     }
 
     my += ps(labelOffsetY, t);
+    mx += ps(labelOffsetX, t);
 
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(8);
