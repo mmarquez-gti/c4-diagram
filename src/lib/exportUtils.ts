@@ -59,9 +59,11 @@ export async function exportCurrentLayerToPng(filename: string): Promise<void> {
 // ---------------------------------------------------------------------------
 
 /** Title bar height at top of each page (pt) */
-const TITLE_H = 28;
-/** Back-button bounding box (pt) */
-const BACK_BTN = { x: 24, y: TITLE_H + 6, w: 72, h: 18 };
+const TITLE_H = 32;
+/** Back button dimensions (pt) — placed right-aligned inside the title bar */
+const BACK_BTN_W = 80;
+const BACK_BTN_H = 20;
+const BACK_BTN_MARGIN = 16;
 /** Pixels per point at standard 96 dpi screen (used for image sizing) */
 const PX_PER_PT = 96 / 72;
 /**
@@ -166,7 +168,7 @@ async function captureCanvasPng(container: HTMLElement): Promise<string> {
   try {
     return await toPng(container, {
       backgroundColor: '#030712',
-      pixelRatio: 2,
+      pixelRatio: 3,
     });
   } finally {
     controls.forEach((el) => (el.style.visibility = ''));
@@ -187,13 +189,19 @@ async function captureCanvasPng(container: HTMLElement): Promise<string> {
  *
  * Interactive features:
  * - Each page has a dark title bar with the diagram name.
- * - Sub-diagram pages have a "↑ Back" button that links to the parent page.
+ * - Sub-diagram pages have a "← Back" button in the title bar that links to the parent page.
  * - Nodes that have a child diagram are clickable and navigate to that page.
  *
- * @param project   The C4 project to export.
- * @param filename  Base filename without extension.
+ * @param project     The C4 project to export.
+ * @param filename    Base filename without extension.
+ * @param onProgress  Optional callback invoked after each diagram is captured:
+ *                    (captured, total, diagramTitle)
  */
-export async function exportProjectToPdf(project: C4Project, filename: string): Promise<void> {
+export async function exportProjectToPdf(
+  project: C4Project,
+  filename: string,
+  onProgress?: (current: number, total: number, title: string) => void,
+): Promise<void> {
   const ordered = bfsOrder(project);
   if (ordered.length === 0) return;
 
@@ -239,6 +247,8 @@ export async function exportProjectToPdf(project: C4Project, filename: string): 
         containerHeight: rect.height,
         viewport,
       });
+
+      onProgress?.(capturedPages.length, ordered.length, diagram.title);
     }
   } finally {
     // Restore original diagram unconditionally
@@ -292,24 +302,30 @@ export async function exportProjectToPdf(project: C4Project, filename: string): 
     // ---- Dark title bar ----
     pdf.setFillColor(12, 15, 26);
     pdf.rect(0, 0, pageW, TITLE_H, 'F');
+
+    // ---- Back button (non-root pages) — drawn before title text so text renders on top ----
+    const BX = pageW - BACK_BTN_W - BACK_BTN_MARGIN;
+    const BY = (TITLE_H - BACK_BTN_H) / 2;
+    if (!isRoot) {
+      // Button fill with indigo tint
+      pdf.setFillColor(49, 76, 140);
+      pdf.roundedRect(BX, BY, BACK_BTN_W, BACK_BTN_H, 4, 4, 'F');
+      // Button border
+      pdf.setDrawColor(99, 126, 200);
+      pdf.setLineWidth(0.75);
+      pdf.roundedRect(BX, BY, BACK_BTN_W, BACK_BTN_H, 4, 4, 'S');
+      // Button label
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(10);
+      pdf.setTextColor(220, 230, 255);
+      pdf.text('\u2190 Back', BX + BACK_BTN_W / 2, BY + BACK_BTN_H / 2 + 3.5, { align: 'center' });
+    }
+
+    // ---- Page title ----
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(13);
-    pdf.setTextColor(139, 154, 176);
-    pdf.text(page.title, 24, TITLE_H - 8);
-
-    // ---- Back button (non-root pages) ----
-    if (!isRoot) {
-      const { x: bx, y: by, w: bw, h: bh } = BACK_BTN;
-      pdf.setFillColor(30, 42, 66);
-      pdf.roundedRect(bx, by, bw, bh, 4, 4, 'F');
-      pdf.setDrawColor(50, 70, 110);
-      pdf.setLineWidth(0.5);
-      pdf.roundedRect(bx, by, bw, bh, 4, 4, 'S');
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(9);
-      pdf.setTextColor(180, 200, 230);
-      pdf.text('↑ Back', bx + bw / 2, by + bh / 2 + 3, { align: 'center' });
-    }
+    pdf.setTextColor(180, 198, 220);
+    pdf.text(page.title, 20, TITLE_H / 2 + 4.5);
 
     // ---- Embedded canvas PNG ----
     pdf.addImage(page.dataUrl, 'PNG', 0, imgY, pageW, imgH);
@@ -331,8 +347,9 @@ export async function exportProjectToPdf(project: C4Project, filename: string): 
     if (!isRoot && parentOf[page.diagramId]) {
       const parentPage = pageOf[parentOf[page.diagramId]];
       if (parentPage !== undefined) {
-        const { x: bx, y: by, w: bw, h: bh } = BACK_BTN;
-        pdf.link(bx, by, bw, bh, { pageNumber: parentPage });
+        const BX = pageW - BACK_BTN_W - BACK_BTN_MARGIN;
+        const BY = (TITLE_H - BACK_BTN_H) / 2;
+        pdf.link(BX, BY, BACK_BTN_W, BACK_BTN_H, { pageNumber: parentPage });
       }
     }
 

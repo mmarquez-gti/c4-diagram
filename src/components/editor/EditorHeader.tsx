@@ -134,6 +134,7 @@ export default function EditorHeader() {
   const rightOpen = useStore($rightPanelOpen);
 
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportProgress, setExportProgress] = useState<{ current: number; total: number; title: string } | null>(null);
 
   const canUndo = history.past.length > 0;
   const canRedo = history.future.length > 0;
@@ -176,12 +177,16 @@ export default function EditorHeader() {
   const handleExportPdf = async () => {
     if (!project || exportingPdf) return;
     setExportingPdf(true);
+    setExportProgress(null);
     try {
-      await exportProjectToPdf(project, project.name);
+      await exportProjectToPdf(project, project.name, (current, total, title) => {
+        setExportProgress({ current, total, title });
+      });
     } catch {
       alert('Failed to export PDF. Please try again.');
     } finally {
       setExportingPdf(false);
+      setExportProgress(null);
     }
   };
 
@@ -224,7 +229,45 @@ export default function EditorHeader() {
   ];
 
   return (
-    <header className="flex items-center h-10 bg-[#0c0f1a] border-b border-[#1a2035] shrink-0 px-2 gap-1 select-none">
+    <>
+      {/* Full-screen loading overlay shown during PDF export */}
+      {exportingPdf && (
+        <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#030712]/90 backdrop-blur-sm select-none">
+          {/* Spinner */}
+          <svg
+            className="w-14 h-14 mb-5 text-indigo-400 animate-spin"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+            <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+          </svg>
+
+          <p className="text-[15px] font-semibold text-white mb-1">Generating PDF…</p>
+
+          {exportProgress ? (
+            <>
+              <p className="text-[13px] text-[#8b9ab0] mb-3">
+                {exportProgress.current} / {exportProgress.total} &mdash; {exportProgress.title}
+              </p>
+              {/* Progress bar */}
+              <div className="w-56 h-1.5 rounded-full bg-[#1e2a42] overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-indigo-500 transition-all duration-300"
+                  style={{ width: `${(exportProgress.current / exportProgress.total) * 100}%` }}
+                />
+              </div>
+            </>
+          ) : (
+            <p className="text-[13px] text-[#8b9ab0]">Preparing diagrams…</p>
+          )}
+
+          <p className="text-[11px] text-[#4a5a72] mt-5">Please do not close or navigate away</p>
+        </div>
+      )}
+
+      <header className="flex items-center h-10 bg-[#0c0f1a] border-b border-[#1a2035] shrink-0 px-2 gap-1 select-none">
       {/* Brand mark */}
       <div className="flex items-center gap-2 pr-3 mr-1 border-r border-[#1a2035]">
         <svg className="w-5 h-5 text-indigo-400 shrink-0" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -298,5 +341,6 @@ export default function EditorHeader() {
         </div>
       )}
     </header>
+    </>
   );
 }
