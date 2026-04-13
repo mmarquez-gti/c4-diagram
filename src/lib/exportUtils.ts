@@ -78,12 +78,15 @@ const PDF_IMG_H = CONTENT_H * 2;  // 1628 px
 // Screenshot capture helpers
 // ---------------------------------------------------------------------------
 
+/** Milliseconds to wait after a diagram switch for React and ReactFlow to finish rendering. */
+const RENDER_SETTLE_MS = 100;
+
 /** Pause until React has committed DOM updates and the browser has painted. */
 function waitForReactRender(): Promise<void> {
   return new Promise((resolve) => {
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        setTimeout(resolve, 100);
+        setTimeout(resolve, RENDER_SETTLE_MS);
       });
     });
   });
@@ -284,7 +287,7 @@ export async function exportProjectToPdf(project: C4Project, filename: string): 
   }
 
   // Restore the diagram the user was viewing before the export
-  if (originalDiagramId) jumpToDiagram(originalDiagramId);
+  jumpToDiagram(originalDiagramId ?? project.rootDiagramId);
 
   // ----- Interactive links (added after all pages are built) -----
   for (let i = 0; i < ordered.length; i++) {
