@@ -9,6 +9,7 @@ import {
   getStraightPath,
   getBezierPath,
   getSmoothStepPath,
+  useReactFlow,
 } from '@xyflow/react';
 
 // ---------------------------------------------------------------------------
@@ -18,9 +19,10 @@ import {
 export interface CustomEdgeData extends Record<string, unknown> {
   pathMode?: 'bezier' | 'straight' | 'orthogonal';
   bendPoints?: Array<{ x: number; y: number }>;
+  labelOffsetX?: number;
   labelOffsetY?: number;
   onBendPointsChange?: (edgeId: string, bendPoints: Array<{ x: number; y: number }>) => void;
-  onLabelOffsetYChange?: (edgeId: string, offsetY: number) => void;
+  onLabelOffsetChange?: (edgeId: string, offsetX: number, offsetY: number) => void;
   onAddBendPoint?: (edgeId: string, index: number, point: { x: number; y: number }) => void;
   isSelected?: boolean;
 }
@@ -150,8 +152,10 @@ export default function CustomEdge({
   data,
   selected,
 }: CustomEdgeProps) {
+  const reactFlow = useReactFlow();
   const pathMode = data?.pathMode ?? 'bezier';
   const bendPoints = data?.bendPoints ?? [];
+  const labelOffsetX = data?.labelOffsetX ?? 0;
   const labelOffsetY = data?.labelOffsetY ?? 0;
   const isSelected = data?.isSelected ?? selected;
 
@@ -173,7 +177,7 @@ export default function CustomEdge({
       // No bend points — use React Flow's built-in path generators for cleaner results
       if (pathMode === 'straight') {
         const [p, lx, ly] = getStraightPath({ sourceX, sourceY, targetX, targetY });
-        return { edgePath: p, labelX: lx, labelY: ly + labelOffsetY };
+        return { edgePath: p, labelX: lx + labelOffsetX, labelY: ly + labelOffsetY };
       }
       if (pathMode === 'orthogonal') {
         const [p, lx, ly] = getSmoothStepPath({
@@ -185,7 +189,7 @@ export default function CustomEdge({
           targetPosition,
           borderRadius: 0,
         });
-        return { edgePath: p, labelX: lx, labelY: ly + labelOffsetY };
+        return { edgePath: p, labelX: lx + labelOffsetX, labelY: ly + labelOffsetY };
       }
       // Default: bezier
       const [p, lx, ly] = getBezierPath({
@@ -196,7 +200,7 @@ export default function CustomEdge({
         sourcePosition,
         targetPosition,
       });
-      return { edgePath: p, labelX: lx, labelY: ly + labelOffsetY };
+      return { edgePath: p, labelX: lx + labelOffsetX, labelY: ly + labelOffsetY };
     }
 
     // With bend points — use custom path building
@@ -214,7 +218,7 @@ export default function CustomEdge({
     }
 
     const mid = getPathMidpoint(allPoints);
-    return { edgePath: path, labelX: mid.x, labelY: mid.y + labelOffsetY };
+    return { edgePath: path, labelX: mid.x + labelOffsetX, labelY: mid.y + labelOffsetY };
   }, [
     pathMode,
     bendPoints,
@@ -225,6 +229,7 @@ export default function CustomEdge({
     targetY,
     sourcePosition,
     targetPosition,
+    labelOffsetX,
     labelOffsetY,
   ]);
 
@@ -233,15 +238,8 @@ export default function CustomEdge({
     (e: React.MouseEvent<SVGPathElement>) => {
       if (!data?.onAddBendPoint) return;
 
-      // Get the SVG coordinate of the click
-      const svg = (e.target as SVGPathElement).closest('svg');
-      if (!svg) return;
-      const point = svg.createSVGPoint();
-      point.x = e.clientX;
-      point.y = e.clientY;
-      const ctm = svg.getScreenCTM();
-      if (!ctm) return;
-      const svgPoint = point.matrixTransform(ctm.inverse());
+      // Convert screen coords to flow coordinates using ReactFlow's utility
+      const flowPoint = reactFlow.screenToFlowPosition({ x: e.clientX, y: e.clientY });
 
       // Find the best segment index to insert the bend point
       let bestIdx = 0;
@@ -249,7 +247,7 @@ export default function CustomEdge({
       for (let i = 0; i < allPoints.length - 1; i++) {
         const a = allPoints[i];
         const b = allPoints[i + 1];
-        const dist = pointToSegmentDist(svgPoint.x, svgPoint.y, a.x, a.y, b.x, b.y);
+        const dist = pointToSegmentDist(flowPoint.x, flowPoint.y, a.x, a.y, b.x, b.y);
         if (dist < bestDist) {
           bestDist = dist;
           bestIdx = i;
@@ -257,9 +255,9 @@ export default function CustomEdge({
       }
 
       // Insert after the first point of the best segment (which is index in bendPoints)
-      data.onAddBendPoint(id, bestIdx, { x: svgPoint.x, y: svgPoint.y });
+      data.onAddBendPoint(id, bestIdx, { x: flowPoint.x, y: flowPoint.y });
     },
-    [id, data, allPoints],
+    [id, data, allPoints, reactFlow],
   );
 
   // Handle dragging a bend point
@@ -273,24 +271,16 @@ export default function CustomEdge({
       const startX = e.clientX;
       const startY = e.clientY;
       const origPoint = bendPoints[bpIndex];
-
-      // Get SVG CTM for coordinate conversion
-      const svg = (e.target as SVGElement).closest('svg');
-      if (!svg) return;
-      const ctm = svg.getScreenCTM();
-      if (!ctm) return;
+      const zoom = reactFlow.getViewport().zoom;
 
       const handleMouseMove = (moveEvt: MouseEvent) => {
-        const dx = moveEvt.clientX - startX;
-        const dy = moveEvt.clientY - startY;
-        // Convert screen delta to SVG delta
-        const scaleX = 1 / ctm.a;
-        const scaleY = 1 / ctm.d;
+        const dx = (moveEvt.clientX - startX) / zoom;
+        const dy = (moveEvt.clientY - startY) / zoom;
 
         const newBendPoints = [...bendPoints];
         newBendPoints[bpIndex] = {
-          x: origPoint.x + dx * scaleX,
-          y: origPoint.y + dy * scaleY,
+          x: origPoint.x + dx,
+          y: origPoint.y + dy,
         };
         data.onBendPointsChange!(id, newBendPoints);
       };
@@ -303,27 +293,27 @@ export default function CustomEdge({
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
     },
-    [id, data, bendPoints],
+    [id, data, bendPoints, reactFlow],
   );
 
-  // Handle dragging the label
+  // Handle dragging the label (2D: both X and Y)
   const handleLabelMouseDown = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
       e.preventDefault();
 
-      if (!data?.onLabelOffsetYChange) return;
+      if (!data?.onLabelOffsetChange) return;
 
+      const startX = e.clientX;
       const startY = e.clientY;
-      const origOffset = labelOffsetY;
-
-      const svg = (e.target as HTMLElement).closest('.react-flow')?.querySelector('svg');
-      const ctm = svg?.getScreenCTM();
-      const scaleY = ctm ? 1 / ctm.d : 1;
+      const origOffsetX = labelOffsetX;
+      const origOffsetY = labelOffsetY;
+      const zoom = reactFlow.getViewport().zoom;
 
       const handleMouseMove = (moveEvt: MouseEvent) => {
-        const dy = moveEvt.clientY - startY;
-        data.onLabelOffsetYChange!(id, origOffset + dy * scaleY);
+        const dx = (moveEvt.clientX - startX) / zoom;
+        const dy = (moveEvt.clientY - startY) / zoom;
+        data.onLabelOffsetChange!(id, origOffsetX + dx, origOffsetY + dy);
       };
 
       const handleMouseUp = () => {
@@ -334,7 +324,7 @@ export default function CustomEdge({
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
     },
-    [id, data, labelOffsetY],
+    [id, data, labelOffsetX, labelOffsetY, reactFlow],
   );
 
   return (
@@ -392,7 +382,7 @@ export default function CustomEdge({
               position: 'absolute',
               transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
               pointerEvents: 'all',
-              cursor: 'ns-resize',
+              cursor: 'move',
               userSelect: 'none',
             }}
             className="nodrag nopan"

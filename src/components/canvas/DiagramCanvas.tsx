@@ -107,7 +107,7 @@ function toFlowEdge(
   selectedId: string | null,
   callbacks: {
     onBendPointsChange: (edgeId: string, bendPoints: Array<{ x: number; y: number }>) => void;
-    onLabelOffsetYChange: (edgeId: string, offsetY: number) => void;
+    onLabelOffsetChange: (edgeId: string, offsetX: number, offsetY: number) => void;
     onAddBendPoint: (edgeId: string, index: number, point: { x: number; y: number }) => void;
   },
 ): Edge {
@@ -150,10 +150,11 @@ function toFlowEdge(
     data: {
       pathMode: e.pathMode ?? 'bezier',
       bendPoints: e.bendPoints ?? [],
+      labelOffsetX: e.labelOffsetX ?? 0,
       labelOffsetY: e.labelOffsetY ?? 0,
       isSelected,
       onBendPointsChange: callbacks.onBendPointsChange,
-      onLabelOffsetYChange: callbacks.onLabelOffsetYChange,
+      onLabelOffsetChange: callbacks.onLabelOffsetChange,
       onAddBendPoint: callbacks.onAddBendPoint,
     },
   };
@@ -186,9 +187,9 @@ export default function DiagramCanvas() {
     [],
   );
 
-  const handleLabelOffsetYChange = useCallback(
-    (edgeId: string, offsetY: number) => {
-      storeUpdateEdge(edgeId, { labelOffsetY: offsetY });
+  const handleLabelOffsetChange = useCallback(
+    (edgeId: string, offsetX: number, offsetY: number) => {
+      storeUpdateEdge(edgeId, { labelOffsetX: offsetX, labelOffsetY: offsetY });
     },
     [],
   );
@@ -211,10 +212,10 @@ export default function DiagramCanvas() {
   const edgeCallbacks = useMemo(
     () => ({
       onBendPointsChange: handleBendPointsChange,
-      onLabelOffsetYChange: handleLabelOffsetYChange,
+      onLabelOffsetChange: handleLabelOffsetChange,
       onAddBendPoint: handleAddBendPoint,
     }),
-    [handleBendPointsChange, handleLabelOffsetYChange, handleAddBendPoint],
+    [handleBendPointsChange, handleLabelOffsetChange, handleAddBendPoint],
   );
 
   useEffect(() => {
@@ -354,10 +355,11 @@ export default function DiagramCanvas() {
             ...(e.data ?? {}),
             pathMode: c4Edge?.pathMode ?? 'bezier',
             bendPoints: c4Edge?.bendPoints ?? [],
+            labelOffsetX: c4Edge?.labelOffsetX ?? 0,
             labelOffsetY: c4Edge?.labelOffsetY ?? 0,
             isSelected: selectedEdgeId === e.id,
             onBendPointsChange: edgeCallbacks.onBendPointsChange,
-            onLabelOffsetYChange: edgeCallbacks.onLabelOffsetYChange,
+            onLabelOffsetChange: edgeCallbacks.onLabelOffsetChange,
             onAddBendPoint: edgeCallbacks.onAddBendPoint,
           },
         };
