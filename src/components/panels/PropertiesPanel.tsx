@@ -131,6 +131,7 @@ export default function PropertiesPanel() {
                 <input
                   className={inputClass}
                   value={selectedNode.label}
+                  placeholder="Label…"
                   onChange={(e) => updateNode(selectedNode.id, { label: e.target.value })}
                 />
               </label>
@@ -141,6 +142,7 @@ export default function PropertiesPanel() {
                   className={`${inputClass} resize-none`}
                   rows={3}
                   value={selectedNode.description ?? ''}
+                  placeholder="Description…"
                   onChange={(e) => updateNode(selectedNode.id, { description: e.target.value || undefined })}
                 />
               </label>

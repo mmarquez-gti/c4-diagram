@@ -64,7 +64,7 @@ const NODE_COLORS: Record<string, string> = {
   Container: '#065f46',
   ContainerDb: '#4c1d95',
   Component: '#1e3a5f',
-  TextLabel: 'transparent',
+  TextLabel: '#e2e8f0',
   GroupBox: '#6366f1',
 };
 
