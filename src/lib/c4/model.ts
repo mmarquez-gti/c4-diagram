@@ -1,6 +1,8 @@
 import type {
+  C4Annotation,
   C4Diagram,
   C4Edge,
+  C4GroupBox,
   C4Level,
   C4Node,
   C4NodeType,
@@ -337,5 +339,181 @@ export function updateEdgeInProject(
     project,
     diagramId,
     updateEdgeInDiagram(diagram, edgeId, patch),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Annotation helpers
+// ---------------------------------------------------------------------------
+
+export interface CreateAnnotationOptions {
+  text?: string;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  fontSize?: number;
+  color?: string;
+  fontWeight?: C4Annotation['fontWeight'];
+  fontStyle?: C4Annotation['fontStyle'];
+}
+
+export function createAnnotation(options: CreateAnnotationOptions = {}): C4Annotation {
+  return {
+    id: generateId('ann'),
+    text: options.text ?? 'Text',
+    position: { x: options.x ?? 100, y: options.y ?? 100 },
+    size: { width: options.width ?? 160, height: options.height ?? 50 },
+    fontSize: options.fontSize,
+    color: options.color,
+    fontWeight: options.fontWeight,
+    fontStyle: options.fontStyle,
+  };
+}
+
+export function addAnnotationToDiagram(diagram: C4Diagram, annotation: C4Annotation): C4Diagram {
+  return touchDiagram({ ...diagram, annotations: [...(diagram.annotations ?? []), annotation] });
+}
+
+export function removeAnnotationFromDiagram(diagram: C4Diagram, annotationId: string): C4Diagram {
+  return touchDiagram({
+    ...diagram,
+    annotations: (diagram.annotations ?? []).filter((a) => a.id !== annotationId),
+  });
+}
+
+export function updateAnnotationInDiagram(
+  diagram: C4Diagram,
+  annotationId: string,
+  patch: Partial<Omit<C4Annotation, 'id'>>,
+): C4Diagram {
+  return touchDiagram({
+    ...diagram,
+    annotations: (diagram.annotations ?? []).map((a) =>
+      a.id === annotationId ? { ...a, ...patch } : a,
+    ),
+  });
+}
+
+export function addAnnotationToProject(
+  project: C4Project,
+  diagramId: string,
+  annotation: C4Annotation,
+): C4Project {
+  const diagram = project.diagrams[diagramId];
+  if (!diagram) return project;
+  return updateDiagramInProject(project, diagramId, addAnnotationToDiagram(diagram, annotation));
+}
+
+export function removeAnnotationFromProject(
+  project: C4Project,
+  diagramId: string,
+  annotationId: string,
+): C4Project {
+  const diagram = project.diagrams[diagramId];
+  if (!diagram) return project;
+  return updateDiagramInProject(project, diagramId, removeAnnotationFromDiagram(diagram, annotationId));
+}
+
+export function updateAnnotationInProject(
+  project: C4Project,
+  diagramId: string,
+  annotationId: string,
+  patch: Partial<Omit<C4Annotation, 'id'>>,
+): C4Project {
+  const diagram = project.diagrams[diagramId];
+  if (!diagram) return project;
+  return updateDiagramInProject(
+    project,
+    diagramId,
+    updateAnnotationInDiagram(diagram, annotationId, patch),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// GroupBox helpers
+// ---------------------------------------------------------------------------
+
+export interface CreateGroupBoxOptions {
+  label?: string;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  borderColor?: string;
+  fillColor?: string;
+  borderStyle?: C4GroupBox['borderStyle'];
+  fontSize?: number;
+}
+
+export function createGroupBox(options: CreateGroupBoxOptions = {}): C4GroupBox {
+  return {
+    id: generateId('grp'),
+    label: options.label,
+    position: { x: options.x ?? 80, y: options.y ?? 80 },
+    size: { width: options.width ?? 300, height: options.height ?? 200 },
+    borderColor: options.borderColor,
+    fillColor: options.fillColor,
+    borderStyle: options.borderStyle,
+    fontSize: options.fontSize,
+  };
+}
+
+export function addGroupBoxToDiagram(diagram: C4Diagram, groupBox: C4GroupBox): C4Diagram {
+  return touchDiagram({ ...diagram, groupBoxes: [...(diagram.groupBoxes ?? []), groupBox] });
+}
+
+export function removeGroupBoxFromDiagram(diagram: C4Diagram, groupBoxId: string): C4Diagram {
+  return touchDiagram({
+    ...diagram,
+    groupBoxes: (diagram.groupBoxes ?? []).filter((g) => g.id !== groupBoxId),
+  });
+}
+
+export function updateGroupBoxInDiagram(
+  diagram: C4Diagram,
+  groupBoxId: string,
+  patch: Partial<Omit<C4GroupBox, 'id'>>,
+): C4Diagram {
+  return touchDiagram({
+    ...diagram,
+    groupBoxes: (diagram.groupBoxes ?? []).map((g) =>
+      g.id === groupBoxId ? { ...g, ...patch } : g,
+    ),
+  });
+}
+
+export function addGroupBoxToProject(
+  project: C4Project,
+  diagramId: string,
+  groupBox: C4GroupBox,
+): C4Project {
+  const diagram = project.diagrams[diagramId];
+  if (!diagram) return project;
+  return updateDiagramInProject(project, diagramId, addGroupBoxToDiagram(diagram, groupBox));
+}
+
+export function removeGroupBoxFromProject(
+  project: C4Project,
+  diagramId: string,
+  groupBoxId: string,
+): C4Project {
+  const diagram = project.diagrams[diagramId];
+  if (!diagram) return project;
+  return updateDiagramInProject(project, diagramId, removeGroupBoxFromDiagram(diagram, groupBoxId));
+}
+
+export function updateGroupBoxInProject(
+  project: C4Project,
+  diagramId: string,
+  groupBoxId: string,
+  patch: Partial<Omit<C4GroupBox, 'id'>>,
+): C4Project {
+  const diagram = project.diagrams[diagramId];
+  if (!diagram) return project;
+  return updateDiagramInProject(
+    project,
+    diagramId,
+    updateGroupBoxInDiagram(diagram, groupBoxId, patch),
   );
 }

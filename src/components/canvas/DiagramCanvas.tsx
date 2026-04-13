@@ -38,19 +38,33 @@ import {
   removeNode,
   removeEdge,
   persistCurrentState,
+  updateAnnotationPosition,
+  updateAnnotationSize,
+  removeAnnotation,
+  updateGroupBoxPosition,
+  updateGroupBoxSize,
+  removeGroupBox,
 } from '../../stores/diagramStore';
 import { $selectedNodeId, $selectedEdgeId, selectNode, selectEdge, clearSelection } from '../../stores/selectionStore';
-import type { C4Node as C4NodeData, C4Edge as C4EdgeData } from '../../lib/c4/types';
+import type { C4Node as C4NodeData, C4Edge as C4EdgeData, C4Annotation, C4GroupBox } from '../../lib/c4/types';
 import { getStateFromUrl, replaceStateInUrl } from '../../lib/urlState';
 import { saveToLocalStorage, loadFromLocalStorage } from '../../lib/localState';
 import C4FlowNode from './C4FlowNode';
 import CustomEdge from './CustomEdge';
+import AnnotationNode, { type AnnotationNodeData } from './AnnotationNode';
+import GroupBoxNode, { type GroupBoxNodeData } from './GroupBoxNode';
 
 // ---------------------------------------------------------------------------
 // Custom node / edge types — defined outside component to avoid ReactFlow remounting
 // ---------------------------------------------------------------------------
-const nodeTypes = { c4node: C4FlowNode };
+const nodeTypes = { c4node: C4FlowNode, annotation: AnnotationNode, groupbox: GroupBoxNode };
 const edgeTypes = { custom: CustomEdge };
+
+// ---------------------------------------------------------------------------
+// Visual element ID helpers (annotations use 'ann-' prefix, group boxes 'grp-')
+// ---------------------------------------------------------------------------
+const isAnnotationId = (id: string) => id.startsWith('ann-');
+const isGroupBoxId = (id: string) => id.startsWith('grp-');
 
 // ---------------------------------------------------------------------------
 // Node type colour map
@@ -100,6 +114,62 @@ function toFlowNode(n: C4NodeData, selectedId: string | null): Node {
       overflow: 'visible',
     },
     type: 'c4node',
+  };
+}
+
+function toFlowAnnotation(a: C4Annotation, selectedId: string | null): Node {
+  const isSelected = selectedId === a.id;
+  return {
+    id: a.id,
+    position: a.position,
+    width: a.size.width,
+    height: a.size.height,
+    measured: { width: a.size.width, height: a.size.height },
+    data: {
+      text: a.text,
+      fontSize: a.fontSize,
+      color: a.color,
+      fontWeight: a.fontWeight,
+      fontStyle: a.fontStyle,
+      isSelected,
+    } as AnnotationNodeData,
+    style: {
+      background: 'transparent',
+      border: 'none',
+      borderRadius: 0,
+      padding: 0,
+      overflow: 'visible',
+    },
+    type: 'annotation',
+    zIndex: 10,
+  };
+}
+
+function toFlowGroupBox(g: C4GroupBox, selectedId: string | null): Node {
+  const isSelected = selectedId === g.id;
+  return {
+    id: g.id,
+    position: g.position,
+    width: g.size.width,
+    height: g.size.height,
+    measured: { width: g.size.width, height: g.size.height },
+    data: {
+      label: g.label,
+      borderColor: g.borderColor,
+      fillColor: g.fillColor,
+      borderStyle: g.borderStyle,
+      fontSize: g.fontSize,
+      isSelected,
+    } as GroupBoxNodeData,
+    style: {
+      background: 'transparent',
+      border: 'none',
+      borderRadius: 0,
+      padding: 0,
+      overflow: 'visible',
+    },
+    type: 'groupbox',
+    zIndex: -1,
   };
 }
 
@@ -277,7 +347,11 @@ export default function DiagramCanvas() {
   }, [activeDiagramId, project]);
 
   const initialNodes = useMemo(
-    () => (diagram?.nodes ?? []).map((n) => toFlowNode(n, selectedNodeId)),
+    () => [
+      ...(diagram?.nodes ?? []).map((n) => toFlowNode(n, selectedNodeId)),
+      ...(diagram?.annotations ?? []).map((a) => toFlowAnnotation(a, selectedNodeId)),
+      ...(diagram?.groupBoxes ?? []).map((g) => toFlowGroupBox(g, selectedNodeId)),
+    ],
     // Intentionally limited to diagram identity changes only; selection highlight
     // updates are handled separately via a dedicated useEffect to avoid full remounts.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -297,7 +371,11 @@ export default function DiagramCanvas() {
   // Sync when active diagram changes
   useEffect(() => {
     const d = getActiveDiagram();
-    setNodes((d?.nodes ?? []).map((n) => toFlowNode(n, selectedNodeId)));
+    setNodes([
+      ...(d?.nodes ?? []).map((n) => toFlowNode(n, selectedNodeId)),
+      ...(d?.annotations ?? []).map((a) => toFlowAnnotation(a, selectedNodeId)),
+      ...(d?.groupBoxes ?? []).map((g) => toFlowGroupBox(g, selectedNodeId)),
+    ]);
     setEdges((d?.edges ?? []).map((e) => {
       const flowEdge = toFlowEdge(e, selectedEdgeId, edgeCallbacks);
       flowEdge.reconnectable = selectedEdgeId === e.id || reconnectingEdgeId === e.id;
@@ -314,7 +392,11 @@ export default function DiagramCanvas() {
       return;
     }
     const d = getActiveDiagram();
-    setNodes((d?.nodes ?? []).map((n) => toFlowNode(n, selectedNodeId)));
+    setNodes([
+      ...(d?.nodes ?? []).map((n) => toFlowNode(n, selectedNodeId)),
+      ...(d?.annotations ?? []).map((a) => toFlowAnnotation(a, selectedNodeId)),
+      ...(d?.groupBoxes ?? []).map((g) => toFlowGroupBox(g, selectedNodeId)),
+    ]);
     setEdges((d?.edges ?? []).map((e) => {
       const flowEdge = toFlowEdge(e, selectedEdgeId, edgeCallbacks);
       flowEdge.reconnectable = selectedEdgeId === e.id || reconnectingEdgeId === e.id;
@@ -392,13 +474,19 @@ export default function DiagramCanvas() {
       onNodesChange(changes);
       for (const change of changes) {
         if (change.type === 'remove') {
-          removeNode(change.id);
+          if (isAnnotationId(change.id)) removeAnnotation(change.id);
+          else if (isGroupBoxId(change.id)) removeGroupBox(change.id);
+          else removeNode(change.id);
         }
         if (change.type === 'position' && !change.dragging && change.position) {
-          updateNodePosition(change.id, change.position.x, change.position.y);
+          if (isAnnotationId(change.id)) updateAnnotationPosition(change.id, change.position.x, change.position.y);
+          else if (isGroupBoxId(change.id)) updateGroupBoxPosition(change.id, change.position.x, change.position.y);
+          else updateNodePosition(change.id, change.position.x, change.position.y);
         }
         if (change.type === 'dimensions' && change.dimensions && !change.resizing) {
-          updateNodeSize(change.id, change.dimensions.width, change.dimensions.height);
+          if (isAnnotationId(change.id)) updateAnnotationSize(change.id, change.dimensions.width, change.dimensions.height);
+          else if (isGroupBoxId(change.id)) updateGroupBoxSize(change.id, change.dimensions.width, change.dimensions.height);
+          else updateNodeSize(change.id, change.dimensions.width, change.dimensions.height);
         }
       }
     },
@@ -428,6 +516,11 @@ export default function DiagramCanvas() {
   const handleConnect: OnConnect = useCallback(
     (connection: Connection) => {
       if (selectedEdgeId) return;
+      // Prevent connecting annotations or group boxes
+      if (
+        (connection.source && (isAnnotationId(connection.source) || isGroupBoxId(connection.source))) ||
+        (connection.target && (isAnnotationId(connection.target) || isGroupBoxId(connection.target)))
+      ) return;
 
       setEdges((eds) => addEdge(connection, eds));
       if (connection.source && connection.target) {
