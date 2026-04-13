@@ -1,26 +1,16 @@
 import { atom } from 'nanostores';
-import type { C4Annotation, C4Diagram, C4Edge, C4GroupBox, C4Node, C4NodeType, C4Project } from '../lib/c4/types';
+import type { C4Diagram, C4Edge, C4Node, C4NodeType, C4Project } from '../lib/c4/types';
 import {
-  addAnnotationToProject,
   addEdgeToProject,
-  addGroupBoxToProject,
   addNodeToProject,
-  createAnnotation,
   createEdge,
-  createGroupBox,
   createNode,
   createProject as modelCreateProject,
   createSubdiagram,
-  removeAnnotationFromProject,
   removeEdgeFromProject,
-  removeGroupBoxFromProject,
   removeNodeFromProject,
-  updateAnnotationInProject,
   updateEdgeInProject,
-  updateGroupBoxInProject,
   updateNodeInProject,
-  type CreateAnnotationOptions,
-  type CreateGroupBoxOptions,
   type CreateNodeOptions,
 } from '../lib/c4/model';
 import { $history, snapshot, clearHistory } from './historyStore';
@@ -314,110 +304,4 @@ export function redo(): void {
   const next = future[future.length - 1];
   $history.set({ past: [...past, current], future: future.slice(0, -1) });
   $project.set(next);
-}
-
-// ---------------------------------------------------------------------------
-// Annotation actions
-// ---------------------------------------------------------------------------
-
-/** Add a new visual annotation to the active diagram. */
-export function addAnnotation(options: CreateAnnotationOptions = {}): C4Annotation | null {
-  const project = $project.get();
-  const diagramId = $activeDiagramId.get();
-  if (!project || !diagramId) return null;
-  const annotation = createAnnotation(options);
-  withSnapshot(() => {
-    $project.set(addAnnotationToProject(project, diagramId, annotation));
-  });
-  return annotation;
-}
-
-/** Update arbitrary fields on an annotation in the active diagram. */
-export function updateAnnotation(annotationId: string, patch: Partial<Omit<C4Annotation, 'id'>>): void {
-  const project = $project.get();
-  const diagramId = $activeDiagramId.get();
-  if (!project || !diagramId) return;
-  withSnapshot(() => {
-    $project.set(updateAnnotationInProject(project, diagramId, annotationId, patch));
-  });
-}
-
-/** Update annotation position without snapshotting (called during drag). */
-export function updateAnnotationPosition(annotationId: string, x: number, y: number): void {
-  const project = $project.get();
-  const diagramId = $activeDiagramId.get();
-  if (!project || !diagramId) return;
-  $project.set(updateAnnotationInProject(project, diagramId, annotationId, { position: { x, y } }));
-}
-
-/** Update annotation size without snapshotting (called during resize). */
-export function updateAnnotationSize(annotationId: string, width: number, height: number): void {
-  const project = $project.get();
-  const diagramId = $activeDiagramId.get();
-  if (!project || !diagramId) return;
-  $project.set(updateAnnotationInProject(project, diagramId, annotationId, { size: { width, height } }));
-}
-
-/** Remove an annotation from the active diagram. */
-export function removeAnnotation(annotationId: string): void {
-  const project = $project.get();
-  const diagramId = $activeDiagramId.get();
-  if (!project || !diagramId) return;
-  withSnapshot(() => {
-    $project.set(removeAnnotationFromProject(project, diagramId, annotationId));
-  });
-  saveToLocalStorage({ project: $project.get()!, activeDiagramId: diagramId });
-}
-
-// ---------------------------------------------------------------------------
-// GroupBox actions
-// ---------------------------------------------------------------------------
-
-/** Add a new visual group box to the active diagram. */
-export function addGroupBox(options: CreateGroupBoxOptions = {}): C4GroupBox | null {
-  const project = $project.get();
-  const diagramId = $activeDiagramId.get();
-  if (!project || !diagramId) return null;
-  const groupBox = createGroupBox(options);
-  withSnapshot(() => {
-    $project.set(addGroupBoxToProject(project, diagramId, groupBox));
-  });
-  return groupBox;
-}
-
-/** Update arbitrary fields on a group box in the active diagram. */
-export function updateGroupBox(groupBoxId: string, patch: Partial<Omit<C4GroupBox, 'id'>>): void {
-  const project = $project.get();
-  const diagramId = $activeDiagramId.get();
-  if (!project || !diagramId) return;
-  withSnapshot(() => {
-    $project.set(updateGroupBoxInProject(project, diagramId, groupBoxId, patch));
-  });
-}
-
-/** Update group box position without snapshotting (called during drag). */
-export function updateGroupBoxPosition(groupBoxId: string, x: number, y: number): void {
-  const project = $project.get();
-  const diagramId = $activeDiagramId.get();
-  if (!project || !diagramId) return;
-  $project.set(updateGroupBoxInProject(project, diagramId, groupBoxId, { position: { x, y } }));
-}
-
-/** Update group box size without snapshotting (called during resize). */
-export function updateGroupBoxSize(groupBoxId: string, width: number, height: number): void {
-  const project = $project.get();
-  const diagramId = $activeDiagramId.get();
-  if (!project || !diagramId) return;
-  $project.set(updateGroupBoxInProject(project, diagramId, groupBoxId, { size: { width, height } }));
-}
-
-/** Remove a group box from the active diagram. */
-export function removeGroupBox(groupBoxId: string): void {
-  const project = $project.get();
-  const diagramId = $activeDiagramId.get();
-  if (!project || !diagramId) return;
-  withSnapshot(() => {
-    $project.set(removeGroupBoxFromProject(project, diagramId, groupBoxId));
-  });
-  saveToLocalStorage({ project: $project.get()!, activeDiagramId: diagramId });
 }
