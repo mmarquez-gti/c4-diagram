@@ -30,6 +30,20 @@ export interface C4Node {
 
 export type C4EdgeDirection = 'forward' | 'reverse' | 'bidirectional' | 'none';
 
+/**
+ * Edge path rendering mode:
+ * - 'bezier'     — smooth Bezier curve (default, like draw.io curved)
+ * - 'straight'   — direct straight line
+ * - 'orthogonal' — axis-aligned right-angle segments
+ */
+export type C4EdgePathMode = 'bezier' | 'straight' | 'orthogonal';
+
+/** A 2D point used as a bend/waypoint along an edge path. */
+export interface C4BendPoint {
+  x: number;
+  y: number;
+}
+
 export interface C4Edge {
   id: string;
   source: string; // C4Node.id
@@ -39,6 +53,15 @@ export interface C4Edge {
   direction?: C4EdgeDirection;
   label?: string;
   technology?: string;
+  /** How the edge path is rendered (default: 'bezier'). */
+  pathMode?: C4EdgePathMode;
+  /** Intermediate bend/waypoints — the edge path passes through these in order. */
+  bendPoints?: C4BendPoint[];
+  /**
+   * Vertical offset (in px) of the label from its default midpoint position.
+   * Positive values push the label downward.
+   */
+  labelOffsetY?: number;
 }
 
 export interface C4Diagram {

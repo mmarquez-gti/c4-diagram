@@ -73,6 +73,29 @@ describe('createEdge', () => {
     expect(edge.label).toBe('Calls');
     expect(edge.technology).toBe('HTTP');
   });
+
+  it('stores pathMode', () => {
+    const edge = createEdge({ source: 'a', target: 'b', pathMode: 'straight' });
+    expect(edge.pathMode).toBe('straight');
+  });
+
+  it('stores bendPoints', () => {
+    const bps = [{ x: 100, y: 200 }, { x: 300, y: 400 }];
+    const edge = createEdge({ source: 'a', target: 'b', bendPoints: bps });
+    expect(edge.bendPoints).toEqual(bps);
+  });
+
+  it('stores labelOffsetY', () => {
+    const edge = createEdge({ source: 'a', target: 'b', labelOffsetY: 42 });
+    expect(edge.labelOffsetY).toBe(42);
+  });
+
+  it('defaults new fields to undefined when not provided', () => {
+    const edge = createEdge({ source: 'a', target: 'b' });
+    expect(edge.pathMode).toBeUndefined();
+    expect(edge.bendPoints).toBeUndefined();
+    expect(edge.labelOffsetY).toBeUndefined();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -181,6 +204,31 @@ describe('addEdgeToDiagram / removeEdgeFromDiagram / updateEdgeInDiagram', () =>
 
     d = removeEdgeFromDiagram(d, edge.id);
     expect(d.edges).toHaveLength(0);
+  });
+
+  it('updates pathMode on an edge', () => {
+    let d = createDiagram();
+    const edge = createEdge({ source: 'a', target: 'b' });
+    d = addEdgeToDiagram(d, edge);
+    d = updateEdgeInDiagram(d, edge.id, { pathMode: 'orthogonal' });
+    expect(d.edges[0].pathMode).toBe('orthogonal');
+  });
+
+  it('updates bendPoints on an edge', () => {
+    let d = createDiagram();
+    const edge = createEdge({ source: 'a', target: 'b' });
+    d = addEdgeToDiagram(d, edge);
+    const bps = [{ x: 50, y: 60 }];
+    d = updateEdgeInDiagram(d, edge.id, { bendPoints: bps });
+    expect(d.edges[0].bendPoints).toEqual(bps);
+  });
+
+  it('updates labelOffsetY on an edge', () => {
+    let d = createDiagram();
+    const edge = createEdge({ source: 'a', target: 'b' });
+    d = addEdgeToDiagram(d, edge);
+    d = updateEdgeInDiagram(d, edge.id, { labelOffsetY: -30 });
+    expect(d.edges[0].labelOffsetY).toBe(-30);
   });
 });
 
