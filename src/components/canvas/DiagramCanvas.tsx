@@ -44,12 +44,13 @@ import type { C4Node as C4NodeData, C4Edge as C4EdgeData } from '../../lib/c4/ty
 import { getStateFromUrl, replaceStateInUrl } from '../../lib/urlState';
 import { saveToLocalStorage, loadFromLocalStorage } from '../../lib/localState';
 import C4FlowNode from './C4FlowNode';
+import { TextLabelNode, GroupBoxNode } from './AnnotationNode';
 import CustomEdge from './CustomEdge';
 
 // ---------------------------------------------------------------------------
 // Custom node / edge types — defined outside component to avoid ReactFlow remounting
 // ---------------------------------------------------------------------------
-const nodeTypes = { c4node: C4FlowNode };
+const nodeTypes = { c4node: C4FlowNode, textlabel: TextLabelNode, groupbox: GroupBoxNode };
 const edgeTypes = { custom: CustomEdge };
 
 // ---------------------------------------------------------------------------
@@ -63,6 +64,8 @@ const NODE_COLORS: Record<string, string> = {
   Container: '#065f46',
   ContainerDb: '#4c1d95',
   Component: '#1e3a5f',
+  TextLabel: 'transparent',
+  GroupBox: '#6366f1',
 };
 
 // ---------------------------------------------------------------------------
@@ -70,17 +73,17 @@ const NODE_COLORS: Record<string, string> = {
 // ---------------------------------------------------------------------------
 
 function toFlowNode(n: C4NodeData, selectedId: string | null): Node {
-  const color = NODE_COLORS[n.type] ?? '#374151';
+  const color = n.color ?? NODE_COLORS[n.type] ?? '#374151';
   const isSelected = selectedId === n.id;
+  const isAnnotation = n.type === 'TextLabel' || n.type === 'GroupBox';
+
   return {
     id: n.id,
     position: n.position,
     width: n.size.width,
     height: n.size.height,
-    // Setting measured prevents ReactFlow from resetting handleBounds to undefined
-    // on every setNodes call, which would cause edges to disappear until the
-    // ResizeObserver fires again.
     measured: { width: n.size.width, height: n.size.height },
+    zIndex: n.type === 'GroupBox' ? -1 : 0,
     data: {
       nodeType: n.type,
       label: n.label,
@@ -99,7 +102,8 @@ function toFlowNode(n: C4NodeData, selectedId: string | null): Node {
       padding: 0,
       overflow: 'visible',
     },
-    type: 'c4node',
+    type: isAnnotation ? n.type.toLowerCase() : 'c4node',
+    connectable: !isAnnotation,
   };
 }
 
@@ -544,7 +548,11 @@ export default function DiagramCanvas() {
       >
         <Background variant={BackgroundVariant.Dots} gap={24} color="#374151" />
         <Controls />
-        <MiniMap nodeColor={(n) => (NODE_COLORS[(n.data as { nodeType?: string })?.nodeType ?? ''] ?? '#374151')} />
+        <MiniMap nodeColor={(n) => {
+          const d = n.data as { nodeType?: string; color?: string };
+          if (d.color && (d.nodeType === 'TextLabel' || d.nodeType === 'GroupBox')) return d.color;
+          return NODE_COLORS[d.nodeType ?? ''] ?? '#374151';
+        }} />
         <FitViewOnDiagramChange activeDiagramId={activeDiagramId} />
       </ReactFlow>
     </div>
