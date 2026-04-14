@@ -95,6 +95,7 @@ function toFlowNode(n: C4NodeData, selectedId: string | null): Node {
       technology: n.technology,
       childDiagramId: n.childDiagramId,
       color,
+      textColor: n.textColor,
       isSelected,
       hideIcon: n.hideIcon,
       hideTypeLabel: n.hideTypeLabel,

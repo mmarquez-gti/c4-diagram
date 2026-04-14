@@ -10,6 +10,7 @@ export interface C4FlowNodeData extends Record<string, unknown> {
   technology?: string;
   childDiagramId?: string;
   color: string;
+  textColor?: string;
   isSelected?: boolean;
   hideIcon?: boolean;
   hideTypeLabel?: boolean;
@@ -308,7 +309,7 @@ export default function C4FlowNode({ id, data }: NodeProps) {
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 1,
-          color: '#fff',
+          color: d.textColor ?? '#fff',
         }}
       >
         {/* Type icon */}

@@ -32,6 +32,8 @@ export interface C4Node {
   childDiagramId?: string;
   /** Custom accent color (hex). Used by TextLabel and GroupBox; optional for other types. */
   color?: string;
+  /** Custom text color (hex) for the node labels. Overrides the default white text. */
+  textColor?: string;
   /** Hide the per-type SVG icon inside the node shape (non-annotation nodes only). */
   hideIcon?: boolean;
   /** Hide the small uppercase type-name label (e.g. "BOUNDARY") inside the node shape. */

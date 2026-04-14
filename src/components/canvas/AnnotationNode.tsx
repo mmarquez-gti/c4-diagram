@@ -7,6 +7,7 @@ export interface AnnotationNodeData extends Record<string, unknown> {
   label: string;
   description?: string;
   color?: string;
+  textColor?: string;
   isSelected?: boolean;
 }
 
@@ -109,6 +110,7 @@ export function TextLabelNode({ data }: NodeProps) {
 export function GroupBoxNode({ data }: NodeProps) {
   const d = data as AnnotationNodeData;
   const accentHex = d.color ?? '#6366f1';
+  const labelColor = d.textColor ?? '#e2e8f0';
   const selColor = '#facc15';
   const borderColor = d.isSelected ? selColor : accentHex;
 
@@ -170,7 +172,7 @@ export function GroupBoxNode({ data }: NodeProps) {
           </svg>
           <span
             style={{
-              color: '#e2e8f0',
+              color: labelColor,
               fontSize: '11px',
               fontWeight: 600,
               letterSpacing: '0.04em',
@@ -189,7 +191,7 @@ export function GroupBoxNode({ data }: NodeProps) {
           <div
             style={{
               padding: '4px 10px',
-              color: '#94a3b8',
+              color: `${labelColor}b3`,
               fontSize: '10px',
               lineHeight: 1.3,
             }}
