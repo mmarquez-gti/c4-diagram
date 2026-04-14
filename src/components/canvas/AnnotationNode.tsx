@@ -1,12 +1,15 @@
 'use client';
 
+import { useStore } from '@nanostores/react';
 import { Handle, Position, NodeResizer, type NodeProps } from '@xyflow/react';
+import { $darkMode } from '../../stores/uiStore';
 
 export interface AnnotationNodeData extends Record<string, unknown> {
   nodeType: 'TextLabel' | 'GroupBox';
   label: string;
   description?: string;
   color?: string;
+  textColor?: string;
   isSelected?: boolean;
 }
 
@@ -36,7 +39,8 @@ const hiddenHandleStyle = {
 
 export function TextLabelNode({ data }: NodeProps) {
   const d = data as AnnotationNodeData;
-  const textColor = d.color ?? '#e2e8f0';
+  const darkMode = useStore($darkMode);
+  const textColor = d.color ?? (darkMode ? '#e2e8f0' : '#1e293b');
   const selColor = '#facc15';
 
   return (
@@ -108,7 +112,9 @@ export function TextLabelNode({ data }: NodeProps) {
 
 export function GroupBoxNode({ data }: NodeProps) {
   const d = data as AnnotationNodeData;
+  const darkMode = useStore($darkMode);
   const accentHex = d.color ?? '#6366f1';
+  const labelColor = d.textColor ?? (darkMode ? '#e2e8f0' : '#1e293b');
   const selColor = '#facc15';
   const borderColor = d.isSelected ? selColor : accentHex;
 
@@ -170,7 +176,7 @@ export function GroupBoxNode({ data }: NodeProps) {
           </svg>
           <span
             style={{
-              color: '#e2e8f0',
+              color: labelColor,
               fontSize: '11px',
               fontWeight: 600,
               letterSpacing: '0.04em',
@@ -189,7 +195,8 @@ export function GroupBoxNode({ data }: NodeProps) {
           <div
             style={{
               padding: '4px 10px',
-              color: '#94a3b8',
+              color: labelColor,
+              opacity: 0.7,
               fontSize: '10px',
               lineHeight: 1.3,
             }}

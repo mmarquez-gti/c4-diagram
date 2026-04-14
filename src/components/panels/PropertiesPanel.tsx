@@ -278,6 +278,44 @@ export default function PropertiesPanel() {
                 </div>
               )}
 
+              {selectedNode.type !== 'TextLabel' && (
+                <div className="flex flex-col gap-1.5">
+                  <span className={labelClass} style={{ color: 'var(--c4-text-muted)' }}>Text Color</span>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={selectedNode.textColor ?? '#ffffff'}
+                      onChange={(e) => updateNode(selectedNode.id, { textColor: e.target.value })}
+                      className="w-8 h-8 rounded cursor-pointer bg-transparent"
+                      style={{ border: '1px solid var(--c4-border-strong)' }}
+                      title="Pick text color"
+                    />
+                    <span
+                      className="text-[11px] font-mono"
+                      style={{ color: 'var(--c4-text-muted)' }}
+                    >
+                      {selectedNode.textColor ?? '#ffffff'}
+                    </span>
+                    {selectedNode.textColor && (
+                      <button
+                        onClick={() => updateNode(selectedNode.id, { textColor: undefined })}
+                        className="text-[10px] transition-colors"
+                        style={{ color: 'var(--c4-text-muted)' }}
+                        title="Reset to default"
+                        onMouseEnter={(e) => {
+                          (e.currentTarget as HTMLElement).style.color = 'var(--c4-text-secondary)';
+                        }}
+                        onMouseLeave={(e) => {
+                          (e.currentTarget as HTMLElement).style.color = 'var(--c4-text-muted)';
+                        }}
+                      >
+                        ↺
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {selectedNode.type !== 'TextLabel' && selectedNode.type !== 'GroupBox' && (
                 <div
                   className="mt-auto pt-3"
