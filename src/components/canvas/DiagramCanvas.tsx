@@ -75,12 +75,56 @@ const NODE_COLORS: Record<string, string> = {
   GroupBox: '#6366f1',
 };
 
+/** Default text color for Boundary (near-transparent fill) — falls back to theme. */
+const BOUNDARY_TEXT_COLOR_DARK = '#ffffff';
+const BOUNDARY_TEXT_COLOR_LIGHT = '#1e293b';
+
+
+// ---------------------------------------------------------------------------
+// WCAG contrast helpers
+// ---------------------------------------------------------------------------
+
+/** Compute relative luminance of a 6-digit hex color per WCAG 2.1. */
+function hexLuminance(hex: string): number {
+  const r = parseInt(hex.slice(1, 3), 16) / 255;
+  const g = parseInt(hex.slice(3, 5), 16) / 255;
+  const b = parseInt(hex.slice(5, 7), 16) / 255;
+  const linearize = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * linearize(r) + 0.7152 * linearize(g) + 0.0722 * linearize(b);
+}
+
+/**
+ * Return '#ffffff' or '#0f172a' — whichever achieves higher WCAG contrast
+ * against the given background hex color.
+ */
+function getContrastTextColor(bgHex: string): string {
+  try {
+    const lum = hexLuminance(bgHex);
+    const contrastOnWhite = 1.05 / (lum + 0.05);
+    const contrastOnDark = (lum + 0.05) / 0.058; // 0.058 = luminance(#0f172a) + 0.05
+    return contrastOnWhite >= contrastOnDark ? '#ffffff' : '#0f172a';
+  } catch {
+    return '#ffffff';
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Conversion helpers
 // ---------------------------------------------------------------------------
 
-function toFlowNode(n: C4NodeData, selectedId: string | null): Node {
+function toFlowNode(n: C4NodeData, selectedId: string | null, darkMode: boolean): Node {
   const color = n.color ?? NODE_COLORS[n.type] ?? '#374151';
+
+  // Default text color for nodes that use textColor (all except TextLabel).
+  // Boundary has a near-transparent fill so its text must contrast with the canvas;
+  // all other nodes have a solid fill, so we pick white/dark based on luminance.
+  const defaultTextColor =
+    n.type === 'Boundary'
+      ? (darkMode ? BOUNDARY_TEXT_COLOR_DARK : BOUNDARY_TEXT_COLOR_LIGHT)
+      : getContrastTextColor(color);
+  const textColor = n.type === 'TextLabel' ? undefined : (n.textColor ?? defaultTextColor);
+
+
   const isSelected = selectedId === n.id;
   const isAnnotation = n.type === 'TextLabel' || n.type === 'GroupBox';
 
@@ -101,6 +145,7 @@ function toFlowNode(n: C4NodeData, selectedId: string | null): Node {
       technology: n.technology,
       childDiagramId: n.childDiagramId,
       color,
+      textColor,
       isSelected,
       hideIcon: n.hideIcon,
       hideTypeLabel: n.hideTypeLabel,
@@ -294,7 +339,7 @@ export default function DiagramCanvas() {
   }, []);
 
   const initialNodes = useMemo(
-    () => (diagram?.nodes ?? []).map((n) => toFlowNode(n, selectedNodeId)),
+    () => (diagram?.nodes ?? []).map((n) => toFlowNode(n, selectedNodeId, darkMode)),
     // Intentionally limited to diagram identity changes only; selection highlight
     // updates are handled separately via a dedicated useEffect to avoid full remounts.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -314,7 +359,7 @@ export default function DiagramCanvas() {
   // Sync when active diagram changes
   useEffect(() => {
     const d = getActiveDiagram();
-    setNodes((d?.nodes ?? []).map((n) => toFlowNode(n, selectedNodeId)));
+    setNodes((d?.nodes ?? []).map((n) => toFlowNode(n, selectedNodeId, darkMode)));
     setEdges((d?.edges ?? []).map((e) => {
       const flowEdge = toFlowEdge(e, selectedEdgeId, edgeColor, edgeCallbacks);
       flowEdge.reconnectable = selectedEdgeId === e.id || reconnectingEdgeId === e.id;
@@ -331,7 +376,7 @@ export default function DiagramCanvas() {
       return;
     }
     const d = getActiveDiagram();
-    setNodes((d?.nodes ?? []).map((n) => toFlowNode(n, selectedNodeId)));
+    setNodes((d?.nodes ?? []).map((n) => toFlowNode(n, selectedNodeId, darkMode)));
     setEdges((d?.edges ?? []).map((e) => {
       const flowEdge = toFlowEdge(e, selectedEdgeId, edgeColor, edgeCallbacks);
       flowEdge.reconnectable = selectedEdgeId === e.id || reconnectingEdgeId === e.id;
@@ -373,6 +418,8 @@ export default function DiagramCanvas() {
         };
       }),
     );
+    const d = getActiveDiagram();
+    setNodes((d?.nodes ?? []).map((n) => toFlowNode(n, selectedNodeId, darkMode)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [darkMode]);
 
