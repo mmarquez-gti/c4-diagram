@@ -17,6 +17,7 @@ import { $history } from '../../stores/historyStore';
 import { $leftPanelOpen, $rightPanelOpen, $darkMode } from '../../stores/uiStore';
 import { serializeProject } from '../../lib/mermaid/serializer';
 import { exportCurrentLayerToPng, exportProjectToPdf } from '../../lib/exportUtils';
+import { buildShareUrl } from '../../lib/urlState';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -166,6 +167,7 @@ export default function EditorHeader() {
 
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportProgress, setExportProgress] = useState<{ current: number; total: number; title: string } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const canUndo = history.past.length > 0;
   const canRedo = history.future.length > 0;
@@ -239,6 +241,18 @@ export default function EditorHeader() {
   const handleExportJson = () => {
     if (!project) return;
     downloadFile(`${project.name}.c4m`, JSON.stringify(project, null, 2), 'application/json');
+  };
+
+  const handleShare = async () => {
+    if (!project || !activeDiagramId) return;
+    const url = buildShareUrl({ project, activeDiagramId });
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      prompt('Copy this link to share:', url);
+    }
   };
 
   const fileMenu: MenuEntry[] = [
@@ -419,6 +433,43 @@ export default function EditorHeader() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
             Back
+          </button>
+        )}
+
+        {/* Share button */}
+        {project && activeDiagramId && (
+          <button
+            onClick={handleShare}
+            className="flex items-center gap-1.5 px-2.5 py-1 text-[12px] rounded transition-colors ml-1"
+            style={{
+              color: copied ? 'var(--c4-text-primary)' : 'var(--c4-text-secondary)',
+              backgroundColor: copied ? 'var(--c4-secondary-bg)' : 'transparent',
+            }}
+            title="Copy share link"
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--c4-panel-hover)';
+              (e.currentTarget as HTMLElement).style.color = 'var(--c4-text-primary)';
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLElement).style.backgroundColor = copied ? 'var(--c4-secondary-bg)' : 'transparent';
+              (e.currentTarget as HTMLElement).style.color = copied ? 'var(--c4-text-primary)' : 'var(--c4-text-secondary)';
+            }}
+          >
+            {copied ? (
+              <>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+                Copied!
+              </>
+            ) : (
+              <>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                </svg>
+                Share
+              </>
+            )}
           </button>
         )}
 
