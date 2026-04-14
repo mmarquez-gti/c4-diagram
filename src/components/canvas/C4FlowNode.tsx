@@ -11,6 +11,8 @@ export interface C4FlowNodeData extends Record<string, unknown> {
   childDiagramId?: string;
   color: string;
   isSelected?: boolean;
+  hideIcon?: boolean;
+  hideTypeLabel?: boolean;
 }
 
 const visibleHandleStyle = {
@@ -310,13 +312,17 @@ export default function C4FlowNode({ id, data }: NodeProps) {
         }}
       >
         {/* Type icon */}
-        <div style={{ opacity: 0.85, marginBottom: 2 }}>
-          <NodeTypeIcon nodeType={d.nodeType} />
-        </div>
+        {!d.hideIcon && (
+          <div style={{ opacity: 0.85, marginBottom: 2 }}>
+            <NodeTypeIcon nodeType={d.nodeType} />
+          </div>
+        )}
 
-        <div style={{ fontSize: '9px', opacity: 0.65, textTransform: 'uppercase', letterSpacing: '0.05em', lineHeight: 1.2 }}>
-          {d.nodeType}
-        </div>
+        {!d.hideTypeLabel && (
+          <div style={{ fontSize: '9px', opacity: 0.65, textTransform: 'uppercase', letterSpacing: '0.05em', lineHeight: 1.2 }}>
+            {d.nodeType}
+          </div>
+        )}
         <div style={{ fontWeight: 700, fontSize: '13px', lineHeight: 1.3, marginTop: 1 }}>{d.label}</div>
         {d.description && (
           <div style={{ fontSize: '10px', opacity: 0.75, marginTop: 2 }}>{d.description}</div>

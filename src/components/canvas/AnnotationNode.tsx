@@ -1,6 +1,6 @@
 'use client';
 
-import { NodeResizer, type NodeProps } from '@xyflow/react';
+import { Handle, Position, NodeResizer, type NodeProps } from '@xyflow/react';
 
 export interface AnnotationNodeData extends Record<string, unknown> {
   nodeType: 'TextLabel' | 'GroupBox';
@@ -9,6 +9,26 @@ export interface AnnotationNodeData extends Record<string, unknown> {
   color?: string;
   isSelected?: boolean;
 }
+
+// ---------------------------------------------------------------------------
+// Shared handle styles (mirrors C4FlowNode)
+// ---------------------------------------------------------------------------
+
+const visibleHandleStyle = {
+  width: 10,
+  height: 10,
+  borderRadius: '999px',
+  border: '2px solid var(--c4-handle-border)',
+  background: 'var(--c4-handle-bg)',
+};
+
+const hiddenHandleStyle = {
+  width: 14,
+  height: 14,
+  border: 'none',
+  background: 'transparent',
+  opacity: 0,
+};
 
 // ---------------------------------------------------------------------------
 // TextLabel node — free-floating text annotation
@@ -28,6 +48,14 @@ export function TextLabelNode({ data }: NodeProps) {
         lineClassName="!border-yellow-400/70"
         handleClassName="!bg-yellow-400 !border-yellow-200 !rounded-sm"
       />
+      <Handle className="c4-node-handle-visible" type="source" id="source-top" position={Position.Top} style={{ ...visibleHandleStyle, top: 0, transform: 'translate(-50%, -50%)' }} />
+      <Handle type="target" id="target-top" position={Position.Top} style={{ ...hiddenHandleStyle, top: 0, transform: 'translate(-50%, -50%)' }} />
+      <Handle className="c4-node-handle-visible" type="source" id="source-right" position={Position.Right} style={{ ...visibleHandleStyle, right: 0, transform: 'translate(50%, -50%)' }} />
+      <Handle type="target" id="target-right" position={Position.Right} style={{ ...hiddenHandleStyle, right: 0, transform: 'translate(50%, -50%)' }} />
+      <Handle className="c4-node-handle-visible" type="source" id="source-bottom" position={Position.Bottom} style={{ ...visibleHandleStyle, bottom: 0, transform: 'translate(-50%, 50%)' }} />
+      <Handle type="target" id="target-bottom" position={Position.Bottom} style={{ ...hiddenHandleStyle, bottom: 0, transform: 'translate(-50%, 50%)' }} />
+      <Handle className="c4-node-handle-visible" type="source" id="source-left" position={Position.Left} style={{ ...visibleHandleStyle, left: 0, transform: 'translate(-50%, -50%)' }} />
+      <Handle type="target" id="target-left" position={Position.Left} style={{ ...hiddenHandleStyle, left: 0, transform: 'translate(-50%, -50%)' }} />
       <div
         style={{
           width: '100%',
@@ -93,6 +121,14 @@ export function GroupBoxNode({ data }: NodeProps) {
         lineClassName="!border-yellow-400/70"
         handleClassName="!bg-yellow-400 !border-yellow-200 !rounded-sm"
       />
+      <Handle className="c4-node-handle-visible" type="source" id="source-top" position={Position.Top} style={{ ...visibleHandleStyle, top: 0, transform: 'translate(-50%, -50%)' }} />
+      <Handle type="target" id="target-top" position={Position.Top} style={{ ...hiddenHandleStyle, top: 0, transform: 'translate(-50%, -50%)' }} />
+      <Handle className="c4-node-handle-visible" type="source" id="source-right" position={Position.Right} style={{ ...visibleHandleStyle, right: 0, transform: 'translate(50%, -50%)' }} />
+      <Handle type="target" id="target-right" position={Position.Right} style={{ ...hiddenHandleStyle, right: 0, transform: 'translate(50%, -50%)' }} />
+      <Handle className="c4-node-handle-visible" type="source" id="source-bottom" position={Position.Bottom} style={{ ...visibleHandleStyle, bottom: 0, transform: 'translate(-50%, 50%)' }} />
+      <Handle type="target" id="target-bottom" position={Position.Bottom} style={{ ...hiddenHandleStyle, bottom: 0, transform: 'translate(-50%, 50%)' }} />
+      <Handle className="c4-node-handle-visible" type="source" id="source-left" position={Position.Left} style={{ ...visibleHandleStyle, left: 0, transform: 'translate(-50%, -50%)' }} />
+      <Handle type="target" id="target-left" position={Position.Left} style={{ ...hiddenHandleStyle, left: 0, transform: 'translate(-50%, -50%)' }} />
       <div
         style={{
           width: '100%',

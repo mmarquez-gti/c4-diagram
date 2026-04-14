@@ -216,6 +216,30 @@ export default function PropertiesPanel() {
                 </label>
               )}
 
+              {selectedNode.type !== 'TextLabel' && selectedNode.type !== 'GroupBox' && (
+                <div className="flex flex-col gap-1.5">
+                  <span className={labelClass} style={{ color: 'var(--c4-text-muted)' }}>Display</span>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={!!selectedNode.hideIcon}
+                      onChange={(e) => updateNode(selectedNode.id, { hideIcon: e.target.checked || undefined })}
+                      className="rounded"
+                    />
+                    <span className="text-xs" style={{ color: 'var(--c4-text-secondary)' }}>Hide icon</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={!!selectedNode.hideTypeLabel}
+                      onChange={(e) => updateNode(selectedNode.id, { hideTypeLabel: e.target.checked || undefined })}
+                      className="rounded"
+                    />
+                    <span className="text-xs" style={{ color: 'var(--c4-text-secondary)' }}>Hide type name</span>
+                  </label>
+                </div>
+              )}
+
               {(selectedNode.type === 'TextLabel' || selectedNode.type === 'GroupBox') && (
                 <div className="flex flex-col gap-1.5">
                   <span className={labelClass} style={{ color: 'var(--c4-text-muted)' }}>Color</span>
