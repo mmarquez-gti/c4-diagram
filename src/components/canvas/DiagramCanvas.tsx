@@ -40,6 +40,7 @@ import {
   persistCurrentState,
 } from '../../stores/diagramStore';
 import { $selectedNodeId, $selectedEdgeId, selectNode, selectEdge, clearSelection } from '../../stores/selectionStore';
+import { $darkMode } from '../../stores/uiStore';
 import type { C4Node as C4NodeData, C4Edge as C4EdgeData } from '../../lib/c4/types';
 import { getStateFromUrl, replaceStateInUrl } from '../../lib/urlState';
 import { saveToLocalStorage, loadFromLocalStorage } from '../../lib/localState';
@@ -113,6 +114,7 @@ function toFlowNode(n: C4NodeData, selectedId: string | null): Node {
 function toFlowEdge(
   e: C4EdgeData,
   selectedId: string | null,
+  defaultEdgeColor: string,
   callbacks: {
     onBendPointsChange: (edgeId: string, bendPoints: Array<{ x: number; y: number }>) => void;
     onLabelOffsetChange: (edgeId: string, offsetX: number, offsetY: number) => void;
@@ -120,7 +122,7 @@ function toFlowEdge(
   },
 ): Edge {
   const isSelected = selectedId === e.id;
-  const strokeColor = isSelected ? '#facc15' : '#94a3b8';
+  const strokeColor = isSelected ? '#facc15' : defaultEdgeColor;
   const direction = e.direction ?? 'forward';
   const marker = { type: 'arrowclosed' as const, color: strokeColor };
 
@@ -150,8 +152,8 @@ function toFlowEdge(
       stroke: strokeColor,
       strokeWidth: 1.5,
     },
-    labelStyle: { fill: '#94a3b8', fontSize: 11 },
-    labelBgStyle: { fill: '#1e293b' },
+    labelStyle: { fill: defaultEdgeColor, fontSize: 11 },
+    labelBgStyle: { fill: 'var(--c4-edge-label-bg)' },
     markerStart,
     markerEnd,
     reconnectable: isSelected,
@@ -194,8 +196,12 @@ export default function DiagramCanvas() {
   const activeDiagramId = useStore($activeDiagramId);
   const selectedNodeId = useStore($selectedNodeId);
   const selectedEdgeId = useStore($selectedEdgeId);
+  const darkMode = useStore($darkMode);
 
   const diagram = getActiveDiagram();
+
+  // Edge color depends on theme
+  const edgeColor = darkMode ? '#94a3b8' : '#475569';
 
   const reconnectingRef = useRef(false);
   const restoringFromUrlRef = useRef(false);
@@ -292,7 +298,7 @@ export default function DiagramCanvas() {
   );
 
   const initialEdges = useMemo(
-    () => (diagram?.edges ?? []).map((e) => toFlowEdge(e, selectedEdgeId, edgeCallbacks)),
+    () => (diagram?.edges ?? []).map((e) => toFlowEdge(e, selectedEdgeId, edgeColor, edgeCallbacks)),
     // Same reasoning as initialNodes above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [activeDiagramId, diagram?.id],
@@ -306,7 +312,7 @@ export default function DiagramCanvas() {
     const d = getActiveDiagram();
     setNodes((d?.nodes ?? []).map((n) => toFlowNode(n, selectedNodeId)));
     setEdges((d?.edges ?? []).map((e) => {
-      const flowEdge = toFlowEdge(e, selectedEdgeId, edgeCallbacks);
+      const flowEdge = toFlowEdge(e, selectedEdgeId, edgeColor, edgeCallbacks);
       flowEdge.reconnectable = selectedEdgeId === e.id || reconnectingEdgeId === e.id;
       return flowEdge;
     }));
@@ -323,12 +329,48 @@ export default function DiagramCanvas() {
     const d = getActiveDiagram();
     setNodes((d?.nodes ?? []).map((n) => toFlowNode(n, selectedNodeId)));
     setEdges((d?.edges ?? []).map((e) => {
-      const flowEdge = toFlowEdge(e, selectedEdgeId, edgeCallbacks);
+      const flowEdge = toFlowEdge(e, selectedEdgeId, edgeColor, edgeCallbacks);
       flowEdge.reconnectable = selectedEdgeId === e.id || reconnectingEdgeId === e.id;
       return flowEdge;
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project]);
+
+  // Re-apply edge colors when theme changes
+  useEffect(() => {
+    setEdges((eds) =>
+      eds.map((e) => {
+        const isSelected = selectedEdgeId === e.id;
+        const strokeColor = isSelected ? '#facc15' : edgeColor;
+        const marker = { type: 'arrowclosed' as const, color: strokeColor };
+        const c4Edge = diagram?.edges.find((edge) => edge.id === e.id);
+        const direction = c4Edge?.direction ?? 'forward';
+
+        let markerStart: Edge['markerStart'];
+        let markerEnd: Edge['markerEnd'];
+        if (direction === 'reverse') {
+          markerStart = marker;
+        } else if (direction === 'bidirectional') {
+          markerStart = marker;
+          markerEnd = marker;
+        } else if (direction === 'none') {
+          markerStart = undefined;
+          markerEnd = undefined;
+        } else {
+          markerEnd = marker;
+        }
+
+        return {
+          ...e,
+          style: { ...e.style, stroke: strokeColor },
+          labelStyle: { fill: strokeColor, fontSize: 11 },
+          markerStart,
+          markerEnd,
+        };
+      }),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [darkMode]);
 
   // Update selection highlights
   useEffect(() => {
@@ -347,7 +389,7 @@ export default function DiagramCanvas() {
   useEffect(() => {
     setEdges((eds) =>
       eds.map((e) => {
-        const strokeColor = selectedEdgeId === e.id ? '#facc15' : '#94a3b8';
+        const strokeColor = selectedEdgeId === e.id ? '#facc15' : edgeColor;
         const marker = { type: 'arrowclosed' as const, color: strokeColor };
         const direction = (diagram?.edges.find((edge) => edge.id === e.id)?.direction) ?? 'forward';
 
@@ -373,6 +415,7 @@ export default function DiagramCanvas() {
             ...e.style,
             stroke: strokeColor,
           },
+          labelStyle: { fill: strokeColor, fontSize: 11 },
           markerStart,
           markerEnd,
           reconnectable: selectedEdgeId === e.id || reconnectingEdgeId === e.id,
@@ -391,7 +434,7 @@ export default function DiagramCanvas() {
       }),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [diagram, reconnectingEdgeId, selectedEdgeId]);
+  }, [diagram, reconnectingEdgeId, selectedEdgeId, edgeColor]);
 
   // Drag — update position in store (no snapshot to avoid cluttering history)
   const handleNodesChange: OnNodesChange = useCallback(
@@ -498,23 +541,29 @@ export default function DiagramCanvas() {
   // ---------------------------------------------------------------------------
   if (!project) {
     return (
-      <div className="relative w-full h-full bg-gray-950 flex flex-col items-center justify-center select-none">
+      <div
+        className="relative w-full h-full flex flex-col items-center justify-center select-none"
+        style={{ backgroundColor: 'var(--c4-canvas-bg)' }}
+      >
         <div
           className="absolute inset-0 opacity-10"
           style={{
-            backgroundImage: 'radial-gradient(circle, #6b7280 1px, transparent 1px)',
+            backgroundImage: `radial-gradient(circle, var(--c4-canvas-dots) 1px, transparent 1px)`,
             backgroundSize: '24px 24px',
           }}
         />
         <div className="relative z-10 flex flex-col items-center gap-4 text-center p-8">
-          <div className="w-16 h-16 rounded-2xl bg-gray-800 flex items-center justify-center mb-2">
+          <div
+            className="w-16 h-16 rounded-2xl flex items-center justify-center mb-2"
+            style={{ backgroundColor: 'var(--c4-secondary-bg)' }}
+          >
             <svg className="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                 d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 012-2h2a2 2 0 012 2v10a2 2 0 01-2 2h-2a2 2 0 01-2-2" />
             </svg>
           </div>
-          <p className="text-gray-300 font-medium">No project open</p>
-          <p className="text-gray-500 text-sm max-w-xs">
+          <p className="font-medium" style={{ color: 'var(--c4-text-secondary)' }}>No project open</p>
+          <p className="text-sm max-w-xs" style={{ color: 'var(--c4-text-muted)' }}>
             Use <strong className="text-blue-400">New Project</strong> in the toolbar to create a project.
           </p>
         </div>
@@ -522,8 +571,13 @@ export default function DiagramCanvas() {
     );
   }
 
+  const canvasDotColor = darkMode ? '#374151' : '#cbd5e1';
+
   return (
-    <div id="diagram-canvas-container" style={{ width: '100%', height: '100%' }}>
+    <div
+      id="diagram-canvas-container"
+      style={{ width: '100%', height: '100%', backgroundColor: 'var(--c4-canvas-bg)' }}
+    >
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -547,9 +601,9 @@ export default function DiagramCanvas() {
         defaultEdgeOptions={{ type: 'custom' }}
         fitView
         deleteKeyCode="Delete"
-        colorMode="dark"
+        colorMode={darkMode ? 'dark' : 'light'}
       >
-        <Background variant={BackgroundVariant.Dots} gap={24} color="#374151" />
+        <Background variant={BackgroundVariant.Dots} gap={24} color={canvasDotColor} />
         <Controls />
         <MiniMap nodeColor={(n) => {
           const d = n.data as { nodeType?: string; color?: string };

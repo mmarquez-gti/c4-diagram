@@ -9,13 +9,23 @@ const { title = 'C4 Diagram Creator' } = Astro.props;
 ---
 
 <!doctype html>
-<html lang="en" class="h-full bg-[#0a0c11] text-gray-100">
+<html lang="en" class="h-full">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="Interactive C4 diagram creator and visualiser" />
     <title>{title}</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- Anti-flash: apply light class before first paint if user prefers light mode -->
+    <script is:inline>
+      (function () {
+        try {
+          if (localStorage.getItem('c4:darkMode') === 'false') {
+            document.documentElement.classList.add('light');
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body class="h-full flex flex-col">
     <slot />

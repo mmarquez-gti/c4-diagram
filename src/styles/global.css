@@ -2,6 +2,78 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ---------------------------------------------------------------------------
+ * Theme tokens — dark (default) and light (html.light)
+ * --------------------------------------------------------------------------- */
+
+:root {
+  /* UI chrome */
+  --c4-app-bg: #0a0c11;
+  --c4-panel-bg: #0c0f1a;
+  --c4-secondary-bg: #131826;
+  --c4-panel-hover: #161c2a;
+  --c4-border: #1a2035;
+  --c4-border-strong: #1e2a42;
+
+  /* Text */
+  --c4-text-primary: #d0daea;
+  --c4-text-secondary: #8b9ab0;
+  --c4-text-muted: #4a5a72;
+  --c4-text-faint: #3a4a62;
+
+  /* Canvas */
+  --c4-canvas-bg: #030712;
+  --c4-canvas-dots: #374151;
+  --c4-edge-stroke: #94a3b8;
+  --c4-edge-label-bg: #1e293b;
+
+  /* Menus */
+  --c4-menu-bg: #0f1520;
+  --c4-menu-border: #1e2539;
+  --c4-menu-hover: #1e2a42;
+  --c4-menu-active-bg: #1e2539;
+  --c4-menu-text: #cbd5e1;
+  --c4-menu-shortcut: #4a5568;
+
+  /* Node handles */
+  --c4-handle-border: rgba(255, 255, 255, 0.9);
+  --c4-handle-bg: #111827;
+}
+
+html.light {
+  /* UI chrome */
+  --c4-app-bg: #f8fafc;
+  --c4-panel-bg: #ffffff;
+  --c4-secondary-bg: #f1f5f9;
+  --c4-panel-hover: #e8edf5;
+  --c4-border: #e2e8f0;
+  --c4-border-strong: #d1d5db;
+
+  /* Text */
+  --c4-text-primary: #0f172a;
+  --c4-text-secondary: #475569;
+  --c4-text-muted: #64748b;
+  --c4-text-faint: #94a3b8;
+
+  /* Canvas */
+  --c4-canvas-bg: #f8fafc;
+  --c4-canvas-dots: #cbd5e1;
+  --c4-edge-stroke: #475569;
+  --c4-edge-label-bg: #f1f5f9;
+
+  /* Menus */
+  --c4-menu-bg: #ffffff;
+  --c4-menu-border: #e2e8f0;
+  --c4-menu-hover: #f1f5f9;
+  --c4-menu-active-bg: #e0e7ff;
+  --c4-menu-text: #1e293b;
+  --c4-menu-shortcut: #94a3b8;
+
+  /* Node handles */
+  --c4-handle-border: rgba(0, 0, 0, 0.45);
+  --c4-handle-bg: #e2e8f0;
+}
+
 *,
 *::before,
 *::after {
@@ -13,6 +85,8 @@ body {
   margin: 0;
   padding: 0;
   height: 100%;
+  background-color: var(--c4-app-bg);
+  color: var(--c4-text-primary);
 }
 
 /* Show source connection points only when hovering a C4 node box */
@@ -25,4 +99,20 @@ body {
 .react-flow__node-c4node:hover .c4-node-handle-visible {
   opacity: 1;
   pointer-events: auto;
+}
+
+/* Light-mode overrides for ReactFlow chrome */
+html.light .react-flow__controls button {
+  background-color: #ffffff;
+  border-color: #e2e8f0;
+  color: #475569;
+}
+
+html.light .react-flow__controls button:hover {
+  background-color: #f1f5f9;
+}
+
+html.light .react-flow__minimap {
+  background-color: #f1f5f9 !important;
+  border: 1px solid #e2e8f0;
 }

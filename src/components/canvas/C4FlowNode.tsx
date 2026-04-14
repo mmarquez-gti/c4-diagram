@@ -17,8 +17,8 @@ const visibleHandleStyle = {
   width: 10,
   height: 10,
   borderRadius: '999px',
-  border: '2px solid rgba(255,255,255,0.9)',
-  background: '#111827',
+  border: '2px solid var(--c4-handle-border)',
+  background: 'var(--c4-handle-bg)',
 };
 
 const hiddenHandleStyle = {
