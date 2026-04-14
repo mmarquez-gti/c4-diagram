@@ -89,14 +89,18 @@ body {
   color: var(--c4-text-primary);
 }
 
-/* Show source connection points only when hovering a C4 node box */
-.react-flow__node-c4node .c4-node-handle-visible {
+/* Show source connection points only when hovering a node */
+.react-flow__node-c4node .c4-node-handle-visible,
+.react-flow__node-textlabel .c4-node-handle-visible,
+.react-flow__node-groupbox .c4-node-handle-visible {
   opacity: 0;
   pointer-events: none;
   transition: opacity 120ms ease;
 }
 
-.react-flow__node-c4node:hover .c4-node-handle-visible {
+.react-flow__node-c4node:hover .c4-node-handle-visible,
+.react-flow__node-textlabel:hover .c4-node-handle-visible,
+.react-flow__node-groupbox:hover .c4-node-handle-visible {
   opacity: 1;
   pointer-events: auto;
 }
