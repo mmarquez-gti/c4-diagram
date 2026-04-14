@@ -3,12 +3,14 @@ import { createProject } from './c4/model';
 import { deserializeStateFromHash, serializeStateToHash } from './urlState';
 
 describe('urlState', () => {
-  it('round-trips a project snapshot through a base64url hash', () => {
+  it('round-trips a project snapshot through a compressed hash', () => {
     const project = createProject('URL Save Test');
     const hash = serializeStateToHash({
       project,
       activeDiagramId: project.rootDiagramId,
     });
+
+    expect(hash).toMatch(/^#share=/);
 
     const restored = deserializeStateFromHash(hash);
 
@@ -22,6 +24,6 @@ describe('urlState', () => {
   });
 
   it('returns null for invalid payloads', () => {
-    expect(deserializeStateFromHash('#state=not-valid-base64')).toBeNull();
+    expect(deserializeStateFromHash('#share=not-valid-lz-data')).toBeNull();
   });
 });

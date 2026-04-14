@@ -1,6 +1,7 @@
 'use client';
 
 import { useStore } from '@nanostores/react';
+import { useState } from 'react';
 import {
   $project,
   $activeDiagramId,
@@ -15,6 +16,7 @@ import {
 } from '../../stores/diagramStore';
 import { $history } from '../../stores/historyStore';
 import { serializeProject } from '../../lib/mermaid/serializer';
+import { buildShareUrl } from '../../lib/urlState';
 import type { C4NodeType } from '../../lib/c4/types';
 
 const ADD_NODE_TYPES: { type: C4NodeType; label: string }[] = [
@@ -41,6 +43,7 @@ export default function Toolbar() {
   const activeDiagramId = useStore($activeDiagramId);
   const navigationStack = useStore($navigationStack);
   const history = useStore($history);
+  const [shareCopied, setShareCopied] = useState(false);
 
   const canUndo = history.past.length > 0;
   const canGoBack = navigationStack.length > 1;
@@ -55,6 +58,27 @@ export default function Toolbar() {
       createProject();
     }
     addNode({ type, label: type, x: 120 + Math.random() * 300, y: 80 + Math.random() * 200 });
+  };
+
+  const handleShare = async () => {
+    if (!project || !activeDiagramId) return;
+    const url = buildShareUrl({ project, activeDiagramId });
+    try {
+      await navigator.clipboard.writeText(url);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2000);
+    } catch {
+      // Fallback for non-HTTPS or restricted contexts
+      const input = document.createElement('input');
+      input.value = url;
+      input.style.cssText = 'position:fixed;opacity:0;pointer-events:none';
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand('copy');
+      document.body.removeChild(input);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2000);
+    }
   };
 
   const handleExportMermaid = () => {
@@ -181,6 +205,16 @@ export default function Toolbar() {
       )}
 
       <div className="flex-1" />
+
+      {/* Share */}
+      <button
+        onClick={handleShare}
+        disabled={!project}
+        className="px-2 py-1 text-xs rounded bg-indigo-700 hover:bg-indigo-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        title="Copy share link to clipboard"
+      >
+        {shareCopied ? '✓ Copied!' : '🔗 Share'}
+      </button>
 
       {/* Export */}
       <div className="flex items-center gap-1">
