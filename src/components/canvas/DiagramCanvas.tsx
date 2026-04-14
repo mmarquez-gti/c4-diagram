@@ -65,16 +65,33 @@ const NODE_COLORS: Record<string, string> = {
   Container: '#065f46',
   ContainerDb: '#4c1d95',
   Component: '#1e3a5f',
-  TextLabel: '#e2e8f0',
   GroupBox: '#6366f1',
 };
+
+/** Default text color to use inside nodes when no explicit textColor is set. */
+const DEFAULT_TEXT_COLOR_DARK = '#ffffff';
+const DEFAULT_TEXT_COLOR_LIGHT = '#1e293b';
+
+/** Default TextLabel text color per theme (no background — must contrast with canvas). */
+const TEXT_LABEL_COLOR_DARK = '#e2e8f0';
+const TEXT_LABEL_COLOR_LIGHT = '#1e293b';
 
 // ---------------------------------------------------------------------------
 // Conversion helpers
 // ---------------------------------------------------------------------------
 
-function toFlowNode(n: C4NodeData, selectedId: string | null): Node {
-  const color = n.color ?? NODE_COLORS[n.type] ?? '#374151';
+function toFlowNode(n: C4NodeData, selectedId: string | null, darkMode: boolean): Node {
+  // TextLabel has no background; its `color` IS the text color, so we need a
+  // theme-appropriate default to remain readable on both canvas colours.
+  const color =
+    n.type === 'TextLabel'
+      ? (n.color ?? (darkMode ? TEXT_LABEL_COLOR_DARK : TEXT_LABEL_COLOR_LIGHT))
+      : (n.color ?? NODE_COLORS[n.type] ?? '#374151');
+
+  // Default text color for nodes that use textColor (all except TextLabel).
+  const defaultTextColor = darkMode ? DEFAULT_TEXT_COLOR_DARK : DEFAULT_TEXT_COLOR_LIGHT;
+  const textColor = n.type === 'TextLabel' ? undefined : (n.textColor ?? defaultTextColor);
+
   const isSelected = selectedId === n.id;
   const isAnnotation = n.type === 'TextLabel' || n.type === 'GroupBox';
 
@@ -95,7 +112,7 @@ function toFlowNode(n: C4NodeData, selectedId: string | null): Node {
       technology: n.technology,
       childDiagramId: n.childDiagramId,
       color,
-      textColor: n.textColor,
+      textColor,
       isSelected,
       hideIcon: n.hideIcon,
       hideTypeLabel: n.hideTypeLabel,
@@ -289,7 +306,7 @@ export default function DiagramCanvas() {
   }, []);
 
   const initialNodes = useMemo(
-    () => (diagram?.nodes ?? []).map((n) => toFlowNode(n, selectedNodeId)),
+    () => (diagram?.nodes ?? []).map((n) => toFlowNode(n, selectedNodeId, darkMode)),
     // Intentionally limited to diagram identity changes only; selection highlight
     // updates are handled separately via a dedicated useEffect to avoid full remounts.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -309,7 +326,7 @@ export default function DiagramCanvas() {
   // Sync when active diagram changes
   useEffect(() => {
     const d = getActiveDiagram();
-    setNodes((d?.nodes ?? []).map((n) => toFlowNode(n, selectedNodeId)));
+    setNodes((d?.nodes ?? []).map((n) => toFlowNode(n, selectedNodeId, darkMode)));
     setEdges((d?.edges ?? []).map((e) => {
       const flowEdge = toFlowEdge(e, selectedEdgeId, edgeColor, edgeCallbacks);
       flowEdge.reconnectable = selectedEdgeId === e.id || reconnectingEdgeId === e.id;
@@ -326,7 +343,7 @@ export default function DiagramCanvas() {
       return;
     }
     const d = getActiveDiagram();
-    setNodes((d?.nodes ?? []).map((n) => toFlowNode(n, selectedNodeId)));
+    setNodes((d?.nodes ?? []).map((n) => toFlowNode(n, selectedNodeId, darkMode)));
     setEdges((d?.edges ?? []).map((e) => {
       const flowEdge = toFlowEdge(e, selectedEdgeId, edgeColor, edgeCallbacks);
       flowEdge.reconnectable = selectedEdgeId === e.id || reconnectingEdgeId === e.id;
@@ -335,7 +352,7 @@ export default function DiagramCanvas() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project]);
 
-  // Re-apply edge colors when theme changes
+  // Re-apply theme-aware colors (edges and nodes) when theme changes
   useEffect(() => {
     setEdges((eds) =>
       eds.map((e) => {
@@ -368,6 +385,8 @@ export default function DiagramCanvas() {
         };
       }),
     );
+    const d = getActiveDiagram();
+    setNodes((d?.nodes ?? []).map((n) => toFlowNode(n, selectedNodeId, darkMode)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [darkMode]);
 
@@ -606,7 +625,10 @@ export default function DiagramCanvas() {
         <Controls />
         <MiniMap nodeColor={(n) => {
           const d = n.data as { nodeType?: string; color?: string };
-          if (d.color && (d.nodeType === 'TextLabel' || d.nodeType === 'GroupBox')) return d.color;
+          if (d.nodeType === 'TextLabel') {
+            return d.color ?? (darkMode ? TEXT_LABEL_COLOR_DARK : TEXT_LABEL_COLOR_LIGHT);
+          }
+          if (d.color && d.nodeType === 'GroupBox') return d.color;
           return NODE_COLORS[d.nodeType ?? ''] ?? '#374151';
         }} />
         <FitViewOnDiagramChange activeDiagramId={activeDiagramId} />
