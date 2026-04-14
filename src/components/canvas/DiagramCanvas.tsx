@@ -71,6 +71,7 @@ const NODE_COLORS: Record<string, string> = {
   Container: '#065f46',
   ContainerDb: '#4c1d95',
   Component: '#1e3a5f',
+  TextLabel: '#e2e8f0',
   GroupBox: '#6366f1',
 };
 
@@ -78,9 +79,6 @@ const NODE_COLORS: Record<string, string> = {
 const BOUNDARY_TEXT_COLOR_DARK = '#ffffff';
 const BOUNDARY_TEXT_COLOR_LIGHT = '#1e293b';
 
-/** Default TextLabel text color per theme (no background — must contrast with canvas). */
-const TEXT_LABEL_COLOR_DARK = '#e2e8f0';
-const TEXT_LABEL_COLOR_LIGHT = '#1e293b';
 
 // ---------------------------------------------------------------------------
 // WCAG contrast helpers
@@ -115,12 +113,7 @@ function getContrastTextColor(bgHex: string): string {
 // ---------------------------------------------------------------------------
 
 function toFlowNode(n: C4NodeData, selectedId: string | null, darkMode: boolean): Node {
-  // TextLabel has no background; its `color` IS the text color, so we need a
-  // theme-appropriate default to remain readable on both canvas colours.
-  const color =
-    n.type === 'TextLabel'
-      ? (n.color ?? (darkMode ? TEXT_LABEL_COLOR_DARK : TEXT_LABEL_COLOR_LIGHT))
-      : (n.color ?? NODE_COLORS[n.type] ?? '#374151');
+  const color = n.color ?? NODE_COLORS[n.type] ?? '#374151';
 
   // Default text color for nodes that use textColor (all except TextLabel).
   // Boundary has a near-transparent fill so its text must contrast with the canvas;
@@ -130,6 +123,7 @@ function toFlowNode(n: C4NodeData, selectedId: string | null, darkMode: boolean)
       ? (darkMode ? BOUNDARY_TEXT_COLOR_DARK : BOUNDARY_TEXT_COLOR_LIGHT)
       : getContrastTextColor(color);
   const textColor = n.type === 'TextLabel' ? undefined : (n.textColor ?? defaultTextColor);
+
 
   const isSelected = selectedId === n.id;
   const isAnnotation = n.type === 'TextLabel' || n.type === 'GroupBox';
@@ -391,7 +385,7 @@ export default function DiagramCanvas() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project]);
 
-  // Re-apply theme-aware colors (edges and nodes) when theme changes
+  // Re-apply edge colors when theme changes
   useEffect(() => {
     setEdges((eds) =>
       eds.map((e) => {
@@ -730,7 +724,7 @@ export default function DiagramCanvas() {
         onEdgeClick={handleEdgeClick}
         onPaneClick={handlePaneClick}
         onSelectionChange={handleSelectionChange}
-        selectionOnDrag
+        selectionKeyCode="Control"
         edgesReconnectable
         nodesConnectable={!selectedEdgeId}
         nodeTypes={nodeTypes}
@@ -744,10 +738,7 @@ export default function DiagramCanvas() {
         <Controls />
         <MiniMap nodeColor={(n) => {
           const d = n.data as { nodeType?: string; color?: string };
-          if (d.nodeType === 'TextLabel') {
-            return d.color ?? (darkMode ? TEXT_LABEL_COLOR_DARK : TEXT_LABEL_COLOR_LIGHT);
-          }
-          if (d.color && d.nodeType === 'GroupBox') return d.color;
+          if (d.color && (d.nodeType === 'TextLabel' || d.nodeType === 'GroupBox')) return d.color;
           return NODE_COLORS[d.nodeType ?? ''] ?? '#374151';
         }} />
         <FitViewOnDiagramChange activeDiagramId={activeDiagramId} />
