@@ -48,14 +48,30 @@ function TreeItem({ node, activeDiagramId, indent }: TreeItemProps) {
       <button
         onClick={() => jumpToDiagram(node.id)}
         title={node.title}
-        className={`w-full text-left text-xs px-2 py-1.5 rounded truncate transition-colors ${
-          isActive
-            ? 'bg-indigo-600/80 text-white font-semibold'
-            : 'text-[#8b9ab0] hover:bg-[#161c2a] hover:text-white'
+        className={`w-full text-left text-xs py-1.5 rounded truncate transition-colors ${
+          isActive ? 'bg-indigo-600/80 text-white font-semibold' : ''
         }`}
-        style={{ paddingLeft: `${8 + indent * 12}px` }}
+        style={{
+          paddingLeft: `${8 + indent * 12}px`,
+          paddingRight: 8,
+          color: isActive ? undefined : 'var(--c4-text-secondary)',
+        }}
+        onMouseEnter={(e) => {
+          if (!isActive) {
+            (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--c4-panel-hover)';
+            (e.currentTarget as HTMLElement).style.color = 'var(--c4-text-primary)';
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!isActive) {
+            (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
+            (e.currentTarget as HTMLElement).style.color = 'var(--c4-text-secondary)';
+          }
+        }}
       >
-        {indent > 0 && <span className="text-[#2a3550] mr-1">›</span>}
+        {indent > 0 && (
+          <span style={{ color: 'var(--c4-text-faint)', marginRight: 4 }}>›</span>
+        )}
         {node.title}
       </button>
       {node.children.map((child) => (
@@ -76,21 +92,40 @@ export default function DiagramsPanel() {
 
   return (
     <div
-      className={`relative flex flex-col shrink-0 bg-[#0c0f1a] border-r border-[#1a2035] overflow-hidden transition-[width] duration-200 ease-out ${
+      className={`relative flex flex-col shrink-0 overflow-hidden transition-[width] duration-200 ease-out ${
         open ? 'w-48' : 'w-8'
       }`}
+      style={{
+        backgroundColor: 'var(--c4-panel-bg)',
+        borderRight: '1px solid var(--c4-border)',
+      }}
     >
       {/* Header row — always visible */}
-      <div className="flex items-center border-b border-[#1a2035] h-8 shrink-0">
+      <div
+        className="flex items-center h-8 shrink-0"
+        style={{ borderBottom: '1px solid var(--c4-border)' }}
+      >
         {open ? (
           <>
-            <span className="flex-1 pl-3 text-[11px] font-semibold text-[#3a4a62] uppercase tracking-wider whitespace-nowrap">
+            <span
+              className="flex-1 pl-3 text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap"
+              style={{ color: 'var(--c4-text-faint)' }}
+            >
               Diagrams
             </span>
             <button
               onClick={() => $leftPanelOpen.set(false)}
               title="Collapse diagrams panel"
-              className="w-8 h-full flex items-center justify-center text-[#2a3550] hover:text-[#8b9ab0] hover:bg-[#161c2a] transition-colors shrink-0"
+              className="w-8 h-full flex items-center justify-center transition-colors shrink-0"
+              style={{ color: 'var(--c4-text-faint)' }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.color = 'var(--c4-text-secondary)';
+                (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--c4-panel-hover)';
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.color = 'var(--c4-text-faint)';
+                (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
+              }}
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
@@ -101,7 +136,16 @@ export default function DiagramsPanel() {
           <button
             onClick={() => $leftPanelOpen.set(true)}
             title="Expand diagrams panel"
-            className="w-full h-full flex items-center justify-center text-[#2a3550] hover:text-[#8b9ab0] hover:bg-[#161c2a] transition-colors"
+            className="w-full h-full flex items-center justify-center transition-colors"
+            style={{ color: 'var(--c4-text-faint)' }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLElement).style.color = 'var(--c4-text-secondary)';
+              (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--c4-panel-hover)';
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLElement).style.color = 'var(--c4-text-faint)';
+              (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
+            }}
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
@@ -114,7 +158,9 @@ export default function DiagramsPanel() {
       {open && (
         <>
           {!project ? (
-            <p className="text-xs text-[#2a3a52] p-3 whitespace-nowrap">No project open</p>
+            <p className="text-xs p-3 whitespace-nowrap" style={{ color: 'var(--c4-text-faint)' }}>
+              No project open
+            </p>
           ) : (
             <div className="flex flex-col gap-0.5 p-1.5 overflow-y-auto flex-1 min-w-0">
               <TreeItem node={buildTree(project)} activeDiagramId={activeDiagramId} indent={0} />

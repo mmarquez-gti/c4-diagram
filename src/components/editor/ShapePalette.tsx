@@ -166,17 +166,22 @@ export default function ShapePalette() {
 
   return (
     <div
-      className={`relative flex flex-col shrink-0 bg-[#0c0f1a] border-r border-[#1a2035] overflow-hidden transition-[width] duration-200 ease-out z-10 ${
+      className={`relative flex flex-col shrink-0 overflow-hidden transition-[width] duration-200 ease-out z-10 ${
         expanded ? 'w-44' : 'w-11'
       }`}
+      style={{
+        backgroundColor: 'var(--c4-panel-bg)',
+        borderRight: '1px solid var(--c4-border)',
+      }}
       onMouseEnter={() => setExpanded(true)}
       onMouseLeave={() => setExpanded(false)}
     >
       {/* Header */}
       <div
-        className={`flex items-center border-b border-[#1a2035] h-9 shrink-0 overflow-hidden transition-all duration-200 ${
+        className={`flex items-center h-9 shrink-0 overflow-hidden transition-all duration-200 ${
           expanded ? 'px-3 gap-2' : 'justify-center px-0'
         }`}
+        style={{ borderBottom: '1px solid var(--c4-border)' }}
       >
         <svg
           className="w-4 h-4 text-indigo-400 shrink-0"
@@ -188,7 +193,10 @@ export default function ShapePalette() {
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
         </svg>
         {expanded && (
-          <span className="text-[11px] font-semibold text-[#4a5a72] uppercase tracking-wider whitespace-nowrap">
+          <span
+            className="text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap"
+            style={{ color: 'var(--c4-text-muted)' }}
+          >
             Add Shape
           </span>
         )}
@@ -201,9 +209,15 @@ export default function ShapePalette() {
             key={type}
             onClick={() => handleAdd(type)}
             title={expanded ? description : label}
-            className={`flex items-center gap-2.5 rounded mx-1 transition-colors group hover:bg-[#161c2a] ${
+            className={`flex items-center gap-2.5 rounded mx-1 transition-colors group ${
               expanded ? 'px-2 py-1.5' : 'justify-center p-2'
             }`}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--c4-panel-hover)';
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
+            }}
           >
             {/* Color dot / icon */}
             <span
@@ -215,7 +229,10 @@ export default function ShapePalette() {
 
             {expanded && (
               <div className="flex flex-col items-start text-left overflow-hidden">
-                <span className="text-[12px] text-[#b0bdd0] group-hover:text-white transition-colors leading-none whitespace-nowrap">
+                <span
+                  className="text-[12px] group-hover:text-white transition-colors leading-none whitespace-nowrap"
+                  style={{ color: 'var(--c4-text-secondary)' }}
+                >
                   {label}
                 </span>
               </div>
@@ -227,7 +244,14 @@ export default function ShapePalette() {
       {/* Expand hint when collapsed */}
       {!expanded && (
         <div className="flex-1 flex items-end justify-center pb-3">
-          <svg className="w-3 h-3 text-[#2a3550]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+          <svg
+            className="w-3 h-3"
+            style={{ color: 'var(--c4-text-faint)' }}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            strokeWidth="2"
+          >
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
           </svg>
         </div>
