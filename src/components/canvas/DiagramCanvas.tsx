@@ -35,8 +35,8 @@ import {
   updateNodeSize,
   addEdge as storeAddEdge,
   updateEdge as storeUpdateEdge,
-  removeNode,
-  removeEdge,
+  removeMultiple,
+  pasteItems,
   persistCurrentState,
 } from '../../stores/diagramStore';
 import { $selectedNodeId, $selectedEdgeId, selectNode, selectEdge, clearSelection } from '../../stores/selectionStore';
@@ -47,6 +47,12 @@ import { saveToLocalStorage, loadFromLocalStorage } from '../../lib/localState';
 import C4FlowNode from './C4FlowNode';
 import { TextLabelNode, GroupBoxNode } from './AnnotationNode';
 import CustomEdge from './CustomEdge';
+
+// ---------------------------------------------------------------------------
+// Module-level clipboard for copy/cut/paste operations
+// ---------------------------------------------------------------------------
+let clipboardData: { nodes: C4NodeData[]; edges: C4EdgeData[] } | null = null;
+let pasteCount = 0;
 
 // ---------------------------------------------------------------------------
 // Custom node / edge types — defined outside component to avoid ReactFlow remounting
@@ -438,10 +444,14 @@ export default function DiagramCanvas() {
   const handleNodesChange: OnNodesChange = useCallback(
     (changes: NodeChange[]) => {
       onNodesChange(changes);
+
+      // Batch all node removals into a single history snapshot
+      const removedNodeIds = changes.filter((c) => c.type === 'remove').map((c) => c.id);
+      if (removedNodeIds.length > 0) {
+        removeMultiple(removedNodeIds, []);
+      }
+
       for (const change of changes) {
-        if (change.type === 'remove') {
-          removeNode(change.id);
-        }
         if (change.type === 'position' && !change.dragging && change.position) {
           updateNodePosition(change.id, change.position.x, change.position.y);
         }
@@ -463,10 +473,10 @@ export default function DiagramCanvas() {
         return;
       }
 
-      for (const change of changes) {
-        if (change.type === 'remove') {
-          removeEdge(change.id);
-        }
+      // Batch all edge removals into a single history snapshot
+      const removedEdgeIds = changes.filter((c) => c.type === 'remove').map((c) => c.id);
+      if (removedEdgeIds.length > 0) {
+        removeMultiple([], removedEdgeIds);
       }
     },
     [onEdgesChange],
@@ -519,13 +529,45 @@ export default function DiagramCanvas() {
     setReconnectingEdgeId(null);
   }, []);
 
+  // ---------------------------------------------------------------------------
+  // Multi-selection tracking (used by clipboard operations)
+  // ---------------------------------------------------------------------------
+
+  /** Ref that always holds the currently selected node/edge IDs (from ReactFlow). */
+  const selectedItemsRef = useRef<{ nodeIds: string[]; edgeIds: string[] }>({
+    nodeIds: [],
+    edgeIds: [],
+  });
+
+  const handleSelectionChange = useCallback(
+    ({ nodes: selNodes, edges: selEdges }: { nodes: Node[]; edges: Edge[] }) => {
+      const nodeIds = selNodes.map((n) => n.id);
+      const edgeIds = selEdges.map((e) => e.id);
+      selectedItemsRef.current = { nodeIds, edgeIds };
+
+      // When multiple items are selected clear the single-item selection so the
+      // Properties panel doesn't show stale data.
+      if (nodeIds.length > 1 || edgeIds.length > 1 || (nodeIds.length > 0 && edgeIds.length > 0)) {
+        clearSelection();
+      } else if (nodeIds.length === 0 && edgeIds.length === 0) {
+        clearSelection();
+      }
+      // Single-item selection is handled by handleNodeClick / handleEdgeClick.
+    },
+    [],
+  );
+
   // Selection
-  const handleNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
+  const handleNodeClick = useCallback((e: React.MouseEvent, node: Node) => {
     if (reconnectingRef.current) return;
+    // When Ctrl/Meta/Shift is held ReactFlow is building a multi-selection;
+    // let onSelectionChange handle it instead of overwriting with a single item.
+    if (e.ctrlKey || e.metaKey || e.shiftKey) return;
     selectNode(node.id);
   }, []);
 
-  const handleEdgeClick = useCallback((_: React.MouseEvent, edge: Edge) => {
+  const handleEdgeClick = useCallback((e: React.MouseEvent, edge: Edge) => {
+    if (e.ctrlKey || e.metaKey || e.shiftKey) return;
     selectEdge(edge.id);
   }, []);
 
@@ -533,6 +575,48 @@ export default function DiagramCanvas() {
     if (reconnectingRef.current) return;
     clearSelection();
   }, []);
+
+  // ---------------------------------------------------------------------------
+  // Keyboard shortcuts: Ctrl+C copy, Ctrl+X cut, Ctrl+V paste
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    function handleClipboardKeys(e: KeyboardEvent) {
+      if (!activeDiagramId) return;
+      const isCtrl = e.ctrlKey || e.metaKey;
+      if (!isCtrl) return;
+
+      if (e.key === 'c' || e.key === 'x') {
+        const { nodeIds, edgeIds } = selectedItemsRef.current;
+        const diag = getActiveDiagram();
+        if (!diag) return;
+        const nodes = diag.nodes.filter((n) => nodeIds.includes(n.id));
+        const edges = diag.edges.filter((ed) => edgeIds.includes(ed.id));
+        if (nodes.length === 0 && edges.length === 0) return;
+
+        e.preventDefault();
+        clipboardData = { nodes, edges };
+        pasteCount = 0;
+
+        if (e.key === 'x') {
+          removeMultiple(nodeIds, edgeIds);
+          clearSelection();
+          selectedItemsRef.current = { nodeIds: [], edgeIds: [] };
+        }
+      }
+
+      if (e.key === 'v') {
+        if (!clipboardData || (clipboardData.nodes.length === 0 && clipboardData.edges.length === 0)) return;
+        e.preventDefault();
+        pasteCount += 1;
+        const offset = pasteCount * 20;
+        pasteItems(clipboardData.nodes, clipboardData.edges, offset, offset);
+      }
+    }
+
+    window.addEventListener('keydown', handleClipboardKeys);
+    return () => window.removeEventListener('keydown', handleClipboardKeys);
+  }, [activeDiagramId]);
 
   // ---------------------------------------------------------------------------
   // Empty / no-project states
@@ -592,6 +676,8 @@ export default function DiagramCanvas() {
         onNodeClick={handleNodeClick}
         onEdgeClick={handleEdgeClick}
         onPaneClick={handlePaneClick}
+        onSelectionChange={handleSelectionChange}
+        selectionOnDrag
         edgesReconnectable
         nodesConnectable={!selectedEdgeId}
         nodeTypes={nodeTypes}

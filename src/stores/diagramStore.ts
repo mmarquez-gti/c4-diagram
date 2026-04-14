@@ -7,10 +7,13 @@ import {
   createNode,
   createProject as modelCreateProject,
   createSubdiagram,
+  generateId,
   removeEdgeFromProject,
   removeNodeFromProject,
   updateEdgeInProject,
   updateNodeInProject,
+  removeMultipleFromProject,
+  addMultipleToProject,
   type CreateNodeOptions,
 } from '../lib/c4/model';
 import { $history, snapshot, clearHistory } from './historyStore';
@@ -322,4 +325,65 @@ export function redo(): void {
   const next = future[future.length - 1];
   $history.set({ past: [...past, current], future: future.slice(0, -1) });
   $project.set(next);
+}
+
+// ---------------------------------------------------------------------------
+// Batch operations (multi-select delete / paste)
+// ---------------------------------------------------------------------------
+
+/** Remove multiple nodes and edges in a single history snapshot. */
+export function removeMultiple(nodeIds: string[], edgeIds: string[]): void {
+  const project = $project.get();
+  const diagramId = $activeDiagramId.get();
+  if (!project || !diagramId) return;
+  if (nodeIds.length === 0 && edgeIds.length === 0) return;
+  withSnapshot(() => {
+    $project.set(removeMultipleFromProject(project, diagramId, nodeIds, edgeIds));
+  });
+  saveToLocalStorage({ project: $project.get()!, activeDiagramId: diagramId });
+}
+
+/**
+ * Paste a set of nodes (and intra-selection edges) into the active diagram.
+ * New IDs are generated for all items; positions are offset by (offsetX, offsetY).
+ */
+export function pasteItems(
+  nodes: C4Node[],
+  edges: C4Edge[],
+  offsetX = 20,
+  offsetY = 20,
+): void {
+  const project = $project.get();
+  const diagramId = $activeDiagramId.get();
+  if (!project || !diagramId) return;
+  if (nodes.length === 0 && edges.length === 0) return;
+
+  // Create new IDs for pasted nodes
+  const idMap = new Map<string, string>();
+  const newNodes: C4Node[] = nodes.map((n) => {
+    const newId = generateId('node');
+    idMap.set(n.id, newId);
+    return {
+      ...n,
+      id: newId,
+      position: { x: n.position.x + offsetX, y: n.position.y + offsetY },
+      // Do not clone sub-diagram links
+      childDiagramId: undefined,
+    };
+  });
+
+  // Only include edges where both endpoints are within the pasted set
+  const newEdges: C4Edge[] = edges
+    .filter((e) => idMap.has(e.source) && idMap.has(e.target))
+    .map((e) => ({
+      ...e,
+      id: generateId('edge'),
+      source: idMap.get(e.source)!,
+      target: idMap.get(e.target)!,
+    }));
+
+  withSnapshot(() => {
+    $project.set(addMultipleToProject(project, diagramId, newNodes, newEdges));
+  });
+  persistCurrentState();
 }

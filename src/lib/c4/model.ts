@@ -339,3 +339,70 @@ export function updateEdgeInProject(
     updateEdgeInDiagram(diagram, edgeId, patch),
   );
 }
+
+// ---------------------------------------------------------------------------
+// Batch mutation helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Remove multiple nodes (and any edges connected to them) plus additional
+ * explicitly-specified edges in one atomic diagram update.
+ */
+export function removeMultipleFromDiagram(
+  diagram: C4Diagram,
+  nodeIds: string[],
+  edgeIds: string[],
+): C4Diagram {
+  const nodeIdSet = new Set(nodeIds);
+  const edgeIdSet = new Set(edgeIds);
+  return touchDiagram({
+    ...diagram,
+    nodes: diagram.nodes.filter((n) => !nodeIdSet.has(n.id)),
+    edges: diagram.edges.filter(
+      (e) => !edgeIdSet.has(e.id) && !nodeIdSet.has(e.source) && !nodeIdSet.has(e.target),
+    ),
+  });
+}
+
+/** Add multiple nodes and edges in one atomic diagram update. */
+export function addMultipleToDiagram(
+  diagram: C4Diagram,
+  nodes: C4Node[],
+  edges: C4Edge[],
+): C4Diagram {
+  return touchDiagram({
+    ...diagram,
+    nodes: [...diagram.nodes, ...nodes],
+    edges: [...diagram.edges, ...edges],
+  });
+}
+
+export function removeMultipleFromProject(
+  project: C4Project,
+  diagramId: string,
+  nodeIds: string[],
+  edgeIds: string[],
+): C4Project {
+  const diagram = project.diagrams[diagramId];
+  if (!diagram) return project;
+  return updateDiagramInProject(
+    project,
+    diagramId,
+    removeMultipleFromDiagram(diagram, nodeIds, edgeIds),
+  );
+}
+
+export function addMultipleToProject(
+  project: C4Project,
+  diagramId: string,
+  nodes: C4Node[],
+  edges: C4Edge[],
+): C4Project {
+  const diagram = project.diagrams[diagramId];
+  if (!diagram) return project;
+  return updateDiagramInProject(
+    project,
+    diagramId,
+    addMultipleToDiagram(diagram, nodes, edges),
+  );
+}
