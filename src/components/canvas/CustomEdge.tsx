@@ -158,6 +158,10 @@ export default function CustomEdge({
   const labelOffsetX = data?.labelOffsetX ?? 0;
   const labelOffsetY = data?.labelOffsetY ?? 0;
   const isSelected = data?.isSelected ?? selected;
+  const edgeStrokeColor =
+    typeof style?.stroke === 'string'
+      ? style.stroke
+      : (labelStyle as React.CSSProperties | undefined)?.color?.toString();
 
   // Full set of points: source -> bendPoints -> target
   const allPoints = useMemo(
@@ -396,7 +400,16 @@ export default function CustomEdge({
                 ...(labelBgStyle as React.CSSProperties),
               }}
             >
-              <span style={labelStyle as React.CSSProperties}>{label}</span>
+              <span
+                style={{
+                  ...(labelStyle as React.CSSProperties),
+                  color: edgeStrokeColor,
+                  WebkitTextFillColor: edgeStrokeColor,
+                  opacity: 1,
+                }}
+              >
+                {label}
+              </span>
             </div>
           </div>
         </EdgeLabelRenderer>
