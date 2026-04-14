@@ -205,7 +205,7 @@ function toFlowEdge(
       stroke: strokeColor,
       strokeWidth: 1.5,
     },
-    labelStyle: { fill: defaultEdgeColor, fontSize: 11 },
+    labelStyle: { fill: strokeColor, fontSize: 11 },
     labelBgStyle: { fill: 'var(--c4-edge-label-bg)' },
     markerStart,
     markerEnd,
