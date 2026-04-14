@@ -32,6 +32,10 @@ export interface C4Node {
   childDiagramId?: string;
   /** Custom accent color (hex). Used by TextLabel and GroupBox; optional for other types. */
   color?: string;
+  /** Hide the per-type SVG icon inside the node shape (non-annotation nodes only). */
+  hideIcon?: boolean;
+  /** Hide the small uppercase type-name label (e.g. "BOUNDARY") inside the node shape. */
+  hideTypeLabel?: boolean;
 }
 
 export type C4EdgeDirection = 'forward' | 'reverse' | 'bidirectional' | 'none';

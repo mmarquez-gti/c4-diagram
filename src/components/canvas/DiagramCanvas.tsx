@@ -96,6 +96,8 @@ function toFlowNode(n: C4NodeData, selectedId: string | null): Node {
       childDiagramId: n.childDiagramId,
       color,
       isSelected,
+      hideIcon: n.hideIcon,
+      hideTypeLabel: n.hideTypeLabel,
     },
     style: {
       background: 'transparent',
@@ -107,7 +109,7 @@ function toFlowNode(n: C4NodeData, selectedId: string | null): Node {
       overflow: 'visible',
     },
     type: isAnnotation ? n.type.toLowerCase() : 'c4node',
-    connectable: !isAnnotation,
+    connectable: true,
   };
 }
 
