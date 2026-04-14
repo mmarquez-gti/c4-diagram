@@ -42,7 +42,7 @@ import {
 import { $selectedNodeId, $selectedEdgeId, selectNode, selectEdge, clearSelection } from '../../stores/selectionStore';
 import { $darkMode } from '../../stores/uiStore';
 import type { C4Node as C4NodeData, C4Edge as C4EdgeData } from '../../lib/c4/types';
-import { getStateFromUrl, replaceStateInUrl } from '../../lib/urlState';
+import { getStateFromUrl, clearStateFromUrl } from '../../lib/urlState';
 import { saveToLocalStorage, loadFromLocalStorage } from '../../lib/localState';
 import C4FlowNode from './C4FlowNode';
 import { TextLabelNode, GroupBoxNode } from './AnnotationNode';
@@ -258,6 +258,7 @@ export default function DiagramCanvas() {
         jumpToDiagram(snapshot.activeDiagramId);
       }
       restoringFromUrlRef.current = false;
+      clearStateFromUrl();
       return;
     }
     // Fallback: restore from localStorage if no URL state
@@ -283,11 +284,6 @@ export default function DiagramCanvas() {
     window.addEventListener('keydown', handleSave);
     return () => window.removeEventListener('keydown', handleSave);
   }, []);
-
-  useEffect(() => {
-    if (!project || !activeDiagramId || restoringFromUrlRef.current) return;
-    replaceStateInUrl({ project, activeDiagramId });
-  }, [activeDiagramId, project]);
 
   const initialNodes = useMemo(
     () => (diagram?.nodes ?? []).map((n) => toFlowNode(n, selectedNodeId)),
