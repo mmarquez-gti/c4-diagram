@@ -103,7 +103,7 @@ function getContrastTextColor(bgHex: string): string {
   try {
     const lum = hexLuminance(bgHex);
     const contrastOnWhite = 1.05 / (lum + 0.05);
-    const contrastOnDark = (lum + 0.05) / 0.058; // luminance of #0f172a ≈ 0.008
+    const contrastOnDark = (lum + 0.05) / 0.058; // 0.058 = luminance(#0f172a) + 0.05
     return contrastOnWhite >= contrastOnDark ? '#ffffff' : '#0f172a';
   } catch {
     return '#ffffff';
