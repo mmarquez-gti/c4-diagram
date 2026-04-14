@@ -85,6 +85,7 @@ export function addNode(options: CreateNodeOptions = {}): C4Node | null {
   withSnapshot(() => {
     $project.set(addNodeToProject(project, diagramId, node));
   });
+  persistCurrentState();
   return node;
 }
 
@@ -97,6 +98,7 @@ export function updateNodePosition(nodeId: string, x: number, y: number): void {
   const diagramId = $activeDiagramId.get();
   if (!project || !diagramId) return;
   $project.set(updateNodeInProject(project, diagramId, nodeId, { position: { x, y } }));
+  persistCurrentStateDebounced();
 }
 
 /** Update a node's size in the active diagram.
@@ -107,6 +109,7 @@ export function updateNodeSize(nodeId: string, width: number, height: number): v
   const diagramId = $activeDiagramId.get();
   if (!project || !diagramId) return;
   $project.set(updateNodeInProject(project, diagramId, nodeId, { size: { width, height } }));
+  persistCurrentStateDebounced();
 }
 
 /** Update arbitrary fields on a node in the active diagram. */
@@ -117,6 +120,7 @@ export function updateNode(nodeId: string, patch: Partial<Omit<C4Node, 'id'>>): 
   withSnapshot(() => {
     $project.set(updateNodeInProject(project, diagramId, nodeId, patch));
   });
+  persistCurrentState();
 }
 
 /** Remove a node (and any connected edges) from the active diagram. */
@@ -146,6 +150,7 @@ export function addEdge(
   withSnapshot(() => {
     $project.set(addEdgeToProject(project, diagramId, edge));
   });
+  persistCurrentState();
   return edge;
 }
 
@@ -157,6 +162,7 @@ export function updateEdge(edgeId: string, patch: Partial<Omit<C4Edge, 'id'>>): 
   withSnapshot(() => {
     $project.set(updateEdgeInProject(project, diagramId, edgeId, patch));
   });
+  persistCurrentState();
 }
 
 /** Remove an edge from the active diagram. */
@@ -280,6 +286,18 @@ export function persistCurrentState(): void {
   const activeDiagramId = $activeDiagramId.get();
   if (!project) return;
   saveToLocalStorage({ project, activeDiagramId: activeDiagramId ?? undefined });
+}
+
+/** Debounced version of persistCurrentState — used for high-frequency events
+ *  like drag/resize so we don't hammer localStorage on every pixel change.
+ */
+let _persistDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+function persistCurrentStateDebounced(delayMs = 500): void {
+  if (_persistDebounceTimer !== null) clearTimeout(_persistDebounceTimer);
+  _persistDebounceTimer = setTimeout(() => {
+    _persistDebounceTimer = null;
+    persistCurrentState();
+  }, delayMs);
 }
 
 // ---------------------------------------------------------------------------
