@@ -51,8 +51,8 @@ import CustomEdge from './CustomEdge';
 // ---------------------------------------------------------------------------
 // Module-level clipboard for copy/cut/paste operations
 // ---------------------------------------------------------------------------
-let _clipboard: { nodes: C4NodeData[]; edges: C4EdgeData[] } | null = null;
-let _pasteCount = 0;
+let clipboardData: { nodes: C4NodeData[]; edges: C4EdgeData[] } | null = null;
+let pasteCount = 0;
 
 // ---------------------------------------------------------------------------
 // Custom node / edge types — defined outside component to avoid ReactFlow remounting
@@ -547,7 +547,7 @@ export default function DiagramCanvas() {
 
       // When multiple items are selected clear the single-item selection so the
       // Properties panel doesn't show stale data.
-      if (nodeIds.length > 1 || selEdges.length > 1 || (nodeIds.length > 0 && edgeIds.length > 0)) {
+      if (nodeIds.length > 1 || edgeIds.length > 1 || (nodeIds.length > 0 && edgeIds.length > 0)) {
         clearSelection();
       } else if (nodeIds.length === 0 && edgeIds.length === 0) {
         clearSelection();
@@ -595,8 +595,8 @@ export default function DiagramCanvas() {
         if (nodes.length === 0 && edges.length === 0) return;
 
         e.preventDefault();
-        _clipboard = { nodes, edges };
-        _pasteCount = 0;
+        clipboardData = { nodes, edges };
+        pasteCount = 0;
 
         if (e.key === 'x') {
           removeMultiple(nodeIds, edgeIds);
@@ -606,11 +606,11 @@ export default function DiagramCanvas() {
       }
 
       if (e.key === 'v') {
-        if (!_clipboard || (_clipboard.nodes.length === 0 && _clipboard.edges.length === 0)) return;
+        if (!clipboardData || (clipboardData.nodes.length === 0 && clipboardData.edges.length === 0)) return;
         e.preventDefault();
-        _pasteCount += 1;
-        const offset = _pasteCount * 20;
-        pasteItems(_clipboard.nodes, _clipboard.edges, offset, offset);
+        pasteCount += 1;
+        const offset = pasteCount * 20;
+        pasteItems(clipboardData.nodes, clipboardData.edges, offset, offset);
       }
     }
 
