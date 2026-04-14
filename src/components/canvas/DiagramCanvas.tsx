@@ -205,7 +205,7 @@ function toFlowEdge(
       stroke: strokeColor,
       strokeWidth: 1.5,
     },
-    labelStyle: { fill: strokeColor, fontSize: 11 },
+    labelStyle: { color: strokeColor, fontSize: 11 },
     labelBgStyle: { fill: 'var(--c4-edge-label-bg)' },
     markerStart,
     markerEnd,
@@ -412,7 +412,7 @@ export default function DiagramCanvas() {
         return {
           ...e,
           style: { ...e.style, stroke: strokeColor },
-          labelStyle: { fill: strokeColor, fontSize: 11 },
+          labelStyle: { color: strokeColor, fontSize: 11 },
           markerStart,
           markerEnd,
         };
@@ -466,7 +466,7 @@ export default function DiagramCanvas() {
             ...e.style,
             stroke: strokeColor,
           },
-          labelStyle: { fill: strokeColor, fontSize: 11 },
+          labelStyle: { color: strokeColor, fontSize: 11 },
           markerStart,
           markerEnd,
           reconnectable: selectedEdgeId === e.id || reconnectingEdgeId === e.id,
