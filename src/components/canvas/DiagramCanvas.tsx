@@ -118,7 +118,7 @@ function getContrastTextColor(bgHex: string): string {
  * otherwise be duplicated across toFlowEdge and multiple sync effects.
  */
 function buildEdgeMarkers(
-  direction: C4EdgeData['direction'],
+  direction: C4EdgeData['direction'] | undefined,
   strokeColor: string,
 ): { markerStart: Edge['markerStart']; markerEnd: Edge['markerEnd'] } {
   const marker = { type: 'arrowclosed' as const, color: strokeColor };
