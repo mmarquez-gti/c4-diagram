@@ -303,9 +303,8 @@ export default function DiagramCanvas() {
   );
 
   useEffect(() => {
-    function applyUrlState(): boolean {
-      const snapshot = getStateFromUrl();
-      if (!snapshot) return false;
+    const snapshot = getStateFromUrl();
+    if (snapshot) {
       restoringFromUrlRef.current = true;
       loadProject(snapshot.project);
       if (snapshot.activeDiagramId && snapshot.activeDiagramId !== snapshot.project.rootDiagramId) {
@@ -313,29 +312,18 @@ export default function DiagramCanvas() {
       }
       restoringFromUrlRef.current = false;
       clearStateFromUrl();
-      return true;
+      return;
     }
-
-    // On initial mount: try URL state first, fall back to localStorage.
-    if (!applyUrlState()) {
-      const local = loadFromLocalStorage();
-      if (local) {
-        restoringFromUrlRef.current = true;
-        loadProject(local.project);
-        if (local.activeDiagramId && local.activeDiagramId !== local.project.rootDiagramId) {
-          jumpToDiagram(local.activeDiagramId);
-        }
-        restoringFromUrlRef.current = false;
+    // Fallback: restore from localStorage if no URL state
+    const local = loadFromLocalStorage();
+    if (local) {
+      restoringFromUrlRef.current = true;
+      loadProject(local.project);
+      if (local.activeDiagramId && local.activeDiagramId !== local.project.rootDiagramId) {
+        jumpToDiagram(local.activeDiagramId);
       }
+      restoringFromUrlRef.current = false;
     }
-
-    // Handle in-page hash navigation (same origin/path, hash changes without a
-    // full reload, e.g. user pastes a share URL while already on /editor).
-    function handleShareUrlHashChange() {
-      applyUrlState();
-    }
-    window.addEventListener('hashchange', handleShareUrlHashChange);
-    return () => window.removeEventListener('hashchange', handleShareUrlHashChange);
   }, []);
 
   // Ctrl+S / Cmd+S — explicit save to localStorage
