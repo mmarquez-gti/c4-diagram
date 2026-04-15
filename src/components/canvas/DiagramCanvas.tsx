@@ -43,7 +43,7 @@ import { $selectedNodeId, $selectedEdgeId, selectNode, selectEdge, clearSelectio
 import { $darkMode } from '../../stores/uiStore';
 import type { C4Node as C4NodeData, C4Edge as C4EdgeData } from '../../lib/c4/types';
 import { getStateFromUrl, clearStateFromUrl } from '../../lib/urlState';
-import { saveToLocalStorage, loadFromLocalStorage } from '../../lib/localState';
+import { loadFromLocalStorage } from '../../lib/localState';
 import C4FlowNode from './C4FlowNode';
 import { TextLabelNode, GroupBoxNode } from './AnnotationNode';
 import CustomEdge from './CustomEdge';
@@ -112,6 +112,22 @@ function getContrastTextColor(bgHex: string): string {
 // Conversion helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Build edge marker descriptors for a given direction and stroke color.
+ * Centralises the direction → markerStart/markerEnd logic that would
+ * otherwise be duplicated across toFlowEdge and multiple sync effects.
+ */
+function buildEdgeMarkers(
+  direction: C4EdgeData['direction'] | undefined,
+  strokeColor: string,
+): { markerStart: Edge['markerStart']; markerEnd: Edge['markerEnd'] } {
+  const marker = { type: 'arrowclosed' as const, color: strokeColor };
+  if (direction === 'reverse') return { markerStart: marker, markerEnd: undefined };
+  if (direction === 'bidirectional') return { markerStart: marker, markerEnd: marker };
+  if (direction === 'none') return { markerStart: undefined, markerEnd: undefined };
+  return { markerStart: undefined, markerEnd: marker }; // 'forward' (default)
+}
+
 function toFlowNode(n: C4NodeData, selectedId: string | null, darkMode: boolean): Node {
   const color = n.color ?? NODE_COLORS[n.type] ?? '#374151';
 
@@ -123,7 +139,6 @@ function toFlowNode(n: C4NodeData, selectedId: string | null, darkMode: boolean)
       ? (darkMode ? BOUNDARY_TEXT_COLOR_DARK : BOUNDARY_TEXT_COLOR_LIGHT)
       : getContrastTextColor(color);
   const textColor = n.type === 'TextLabel' ? undefined : (n.textColor ?? defaultTextColor);
-
 
   const isSelected = selectedId === n.id;
   const isAnnotation = n.type === 'TextLabel' || n.type === 'GroupBox';
@@ -176,22 +191,7 @@ function toFlowEdge(
 ): Edge {
   const isSelected = selectedId === e.id;
   const strokeColor = isSelected ? '#facc15' : defaultEdgeColor;
-  const direction = e.direction ?? 'forward';
-  const marker = { type: 'arrowclosed' as const, color: strokeColor };
-
-  let markerStart: Edge['markerStart'];
-  let markerEnd: Edge['markerEnd'];
-  if (direction === 'reverse') {
-    markerStart = marker;
-  } else if (direction === 'bidirectional') {
-    markerStart = marker;
-    markerEnd = marker;
-  } else if (direction === 'none') {
-    markerStart = undefined;
-    markerEnd = undefined;
-  } else {
-    markerEnd = marker;
-  }
+  const { markerStart, markerEnd } = buildEdgeMarkers(e.direction, strokeColor);
 
   return {
     id: e.id,
@@ -394,23 +394,8 @@ export default function DiagramCanvas() {
       eds.map((e) => {
         const isSelected = selectedEdgeId === e.id;
         const strokeColor = isSelected ? '#facc15' : edgeColor;
-        const marker = { type: 'arrowclosed' as const, color: strokeColor };
         const c4Edge = diagram?.edges.find((edge) => edge.id === e.id);
-        const direction = c4Edge?.direction ?? 'forward';
-
-        let markerStart: Edge['markerStart'];
-        let markerEnd: Edge['markerEnd'];
-        if (direction === 'reverse') {
-          markerStart = marker;
-        } else if (direction === 'bidirectional') {
-          markerStart = marker;
-          markerEnd = marker;
-        } else if (direction === 'none') {
-          markerStart = undefined;
-          markerEnd = undefined;
-        } else {
-          markerEnd = marker;
-        }
+        const { markerStart, markerEnd } = buildEdgeMarkers(c4Edge?.direction, strokeColor);
 
         return {
           ...e,
@@ -444,24 +429,8 @@ export default function DiagramCanvas() {
     setEdges((eds) =>
       eds.map((e) => {
         const strokeColor = selectedEdgeId === e.id ? '#facc15' : edgeColor;
-        const marker = { type: 'arrowclosed' as const, color: strokeColor };
-        const direction = (diagram?.edges.find((edge) => edge.id === e.id)?.direction) ?? 'forward';
-
-        let markerStart: Edge['markerStart'];
-        let markerEnd: Edge['markerEnd'];
-        if (direction === 'reverse') {
-          markerStart = marker;
-        } else if (direction === 'bidirectional') {
-          markerStart = marker;
-          markerEnd = marker;
-        } else if (direction === 'none') {
-          markerStart = undefined;
-          markerEnd = undefined;
-        } else {
-          markerEnd = marker;
-        }
-
         const c4Edge = diagram?.edges.find((edge) => edge.id === e.id);
+        const { markerStart, markerEnd } = buildEdgeMarkers(c4Edge?.direction, strokeColor);
 
         return {
           ...e,

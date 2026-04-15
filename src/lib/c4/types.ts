@@ -91,8 +91,6 @@ export interface C4Diagram {
   title: string;
   nodes: C4Node[];
   edges: C4Edge[];
-  /** Cached Mermaid serialisation — regenerated on save */
-  mermaidCache?: string;
   createdAt: string;
   updatedAt: string;
 }

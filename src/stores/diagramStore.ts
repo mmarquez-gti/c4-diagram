@@ -36,8 +36,6 @@ export const $activeDiagramId = atom<string | null>(null);
  */
 export const $navigationStack = atom<string[]>([]);
 
-
-
 // ---------------------------------------------------------------------------
 // Read helpers
 // ---------------------------------------------------------------------------
