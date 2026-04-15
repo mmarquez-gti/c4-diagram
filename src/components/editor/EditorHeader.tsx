@@ -210,7 +210,7 @@ export default function EditorHeader() {
     const diagram = project.diagrams[activeDiagramId];
     const name = diagram?.title ?? project.name;
     try {
-      await exportCurrentLayerToPng(name, darkMode);
+      await exportCurrentLayerToPng(name);
     } catch {
       alert('Failed to export PNG. Please try again.');
     }
@@ -221,7 +221,7 @@ export default function EditorHeader() {
     setExportingPdf(true);
     setExportProgress(null);
     try {
-      await exportProjectToPdf(project, project.name, darkMode, (current, total, title) => {
+      await exportProjectToPdf(project, project.name, (current, total, title) => {
         setExportProgress({ current, total, title });
       });
     } catch {

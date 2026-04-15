@@ -26,25 +26,11 @@ function triggerDownloadUrl(dataUrl: string, filename: string): void {
   a.click();
 }
 
-/** Canvas background color for dark mode (matches --c4-canvas-bg dark token). */
-const CANVAS_BG_DARK = '#030712';
-/** Canvas background color for light mode (matches --c4-canvas-bg light token). */
-const CANVAS_BG_LIGHT = '#f8fafc';
-
-/**
- * Returns the canvas background hex colour that matches the active theme.
- * @param darkMode  Whether the app is currently in dark mode.
- */
-function canvasBg(darkMode: boolean): string {
-  return darkMode ? CANVAS_BG_DARK : CANVAS_BG_LIGHT;
-}
-
 /**
  * Captures the ReactFlow canvas element as a PNG and triggers a download.
  * @param filename  Base filename without extension.
- * @param darkMode  Whether the app is currently in dark mode.
  */
-export async function exportCurrentLayerToPng(filename: string, darkMode: boolean): Promise<void> {
+export async function exportCurrentLayerToPng(filename: string): Promise<void> {
   const container = document.getElementById('diagram-canvas-container');
   if (!container) {
     throw new Error('Canvas container element not found.');
@@ -58,7 +44,7 @@ export async function exportCurrentLayerToPng(filename: string, darkMode: boolea
 
   try {
     const dataUrl = await toPng(container, {
-      backgroundColor: canvasBg(darkMode),
+      backgroundColor: '#030712', // matches canvas bg (gray-950)
       pixelRatio: 2,
     });
     triggerDownloadUrl(dataUrl, `${filename}.png`);
@@ -87,26 +73,6 @@ const PX_PER_PT = 96 / 72;
  * fitView animation and any CSS transitions to settle.
  */
 const REACTFLOW_SETTLE_DELAY_MS = 150;
-
-// PDF theme-color constants — [R, G, B] tuples
-/** Title bar fill */
-const TITLE_BAR_BG_DARK: [number, number, number] = [12, 15, 26];
-const TITLE_BAR_BG_LIGHT: [number, number, number] = [241, 245, 249]; // slate-100
-/** Title bar bottom border */
-const TITLE_BAR_BORDER_DARK: [number, number, number] = [30, 42, 66];
-const TITLE_BAR_BORDER_LIGHT: [number, number, number] = [209, 213, 219];
-/** Title text */
-const TITLE_TEXT_COLOR_DARK: [number, number, number] = [180, 198, 220];
-const TITLE_TEXT_COLOR_LIGHT: [number, number, number] = [15, 23, 42]; // slate-900
-/** Back button fill */
-const BACK_BTN_FILL_DARK: [number, number, number] = [49, 76, 140];
-const BACK_BTN_FILL_LIGHT: [number, number, number] = [224, 231, 255]; // indigo-100
-/** Back button border */
-const BACK_BTN_BORDER_DARK: [number, number, number] = [99, 126, 200];
-const BACK_BTN_BORDER_LIGHT: [number, number, number] = [99, 102, 241]; // indigo-500
-/** Back button label text */
-const BACK_BTN_TEXT_COLOR_DARK: [number, number, number] = [220, 230, 255];
-const BACK_BTN_TEXT_COLOR_LIGHT: [number, number, number] = [67, 56, 202]; // indigo-700
 
 // ---------------------------------------------------------------------------
 // ReactFlow viewport helper
@@ -194,14 +160,14 @@ interface CapturedPage {
  * Hides ReactFlow UI chrome (controls, minimap, attribution) in `container`,
  * captures a PNG data URL, then restores visibility.
  */
-async function captureCanvasPng(container: HTMLElement, darkMode: boolean): Promise<string> {
+async function captureCanvasPng(container: HTMLElement): Promise<string> {
   const controls = container.querySelectorAll<HTMLElement>(
     '.react-flow__controls, .react-flow__minimap, .react-flow__attribution',
   );
   controls.forEach((el) => (el.style.visibility = 'hidden'));
   try {
     return await toPng(container, {
-      backgroundColor: canvasBg(darkMode),
+      backgroundColor: '#030712',
       pixelRatio: 3,
     });
   } finally {
@@ -228,14 +194,12 @@ async function captureCanvasPng(container: HTMLElement, darkMode: boolean): Prom
  *
  * @param project     The C4 project to export.
  * @param filename    Base filename without extension.
- * @param darkMode    Whether the app is currently in dark mode (controls title bar colours).
  * @param onProgress  Optional callback invoked after each diagram is captured:
  *                    (captured, total, diagramTitle)
  */
 export async function exportProjectToPdf(
   project: C4Project,
   filename: string,
-  darkMode: boolean,
   onProgress?: (current: number, total: number, title: string) => void,
 ): Promise<void> {
   const ordered = bfsOrder(project);
@@ -273,7 +237,7 @@ export async function exportProjectToPdf(
 
       const rect = container.getBoundingClientRect();
       const viewport = readReactFlowViewport(container);
-      const dataUrl = await captureCanvasPng(container, darkMode);
+      const dataUrl = await captureCanvasPng(container);
 
       capturedPages.push({
         diagramId,
@@ -335,38 +299,32 @@ export async function exportProjectToPdf(
       pdf.addPage([pageW, pageH], pageW >= pageH ? 'landscape' : 'portrait');
     }
 
-    // ---- Title bar (theme-aware) ----
-    const titleBarBg = darkMode ? TITLE_BAR_BG_DARK : TITLE_BAR_BG_LIGHT;
-    pdf.setFillColor(...titleBarBg);
+    // ---- Dark title bar ----
+    pdf.setFillColor(12, 15, 26);
     pdf.rect(0, 0, pageW, TITLE_H, 'F');
-    // Title bar bottom border
-    const titleBarBorder = darkMode ? TITLE_BAR_BORDER_DARK : TITLE_BAR_BORDER_LIGHT;
-    pdf.setDrawColor(...titleBarBorder);
-    pdf.setLineWidth(0.5);
-    pdf.line(0, TITLE_H, pageW, TITLE_H);
 
     // ---- Back button (non-root pages) — drawn before title text so text renders on top ----
     const BX = pageW - BACK_BTN_W - BACK_BTN_MARGIN;
     const BY = (TITLE_H - BACK_BTN_H) / 2;
     if (!isRoot) {
-      // Button fill — indigo tint in dark mode, softer indigo in light mode
-      pdf.setFillColor(...(darkMode ? BACK_BTN_FILL_DARK : BACK_BTN_FILL_LIGHT));
+      // Button fill with indigo tint
+      pdf.setFillColor(49, 76, 140);
       pdf.roundedRect(BX, BY, BACK_BTN_W, BACK_BTN_H, 4, 4, 'F');
       // Button border
-      pdf.setDrawColor(...(darkMode ? BACK_BTN_BORDER_DARK : BACK_BTN_BORDER_LIGHT));
+      pdf.setDrawColor(99, 126, 200);
       pdf.setLineWidth(0.75);
       pdf.roundedRect(BX, BY, BACK_BTN_W, BACK_BTN_H, 4, 4, 'S');
       // Button label
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(10);
-      pdf.setTextColor(...(darkMode ? BACK_BTN_TEXT_COLOR_DARK : BACK_BTN_TEXT_COLOR_LIGHT));
+      pdf.setTextColor(220, 230, 255);
       pdf.text('\u2190 Back', BX + BACK_BTN_W / 2, BY + BACK_BTN_H / 2 + 3.5, { align: 'center' });
     }
 
     // ---- Page title ----
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(13);
-    pdf.setTextColor(...(darkMode ? TITLE_TEXT_COLOR_DARK : TITLE_TEXT_COLOR_LIGHT));
+    pdf.setTextColor(180, 198, 220);
     pdf.text(page.title, 20, TITLE_H / 2 + 4.5);
 
     // ---- Embedded canvas PNG ----
