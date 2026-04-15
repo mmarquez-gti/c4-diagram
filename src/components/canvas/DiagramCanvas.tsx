@@ -311,6 +311,9 @@ export default function DiagramCanvas() {
         jumpToDiagram(snapshot.activeDiagramId);
       }
       restoringFromUrlRef.current = false;
+      // Persist the URL-loaded state to localStorage so it survives after the
+      // hash is removed from the URL (and on subsequent page loads / refreshes).
+      persistCurrentState();
       clearStateFromUrl();
       return;
     }
