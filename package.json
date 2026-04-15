@@ -37,5 +37,15 @@
     "tailwindcss": "^3.4.0",
     "typescript": "^5.5.0",
     "vitest": "^2.0.0"
+  },
+  "license": "MIT",
+  "author": "mmarquez-gti",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mmarquez-gti/c4-diagram.git"
+  },
+  "homepage": "https://github.com/mmarquez-gti/c4-diagram",
+  "bugs": {
+    "url": "https://github.com/mmarquez-gti/c4-diagram/issues"
   }
 }
