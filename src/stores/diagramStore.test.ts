@@ -8,6 +8,7 @@ import {
   addNode,
   updateNode,
   updateNodePosition,
+  updateNodeSize,
   removeNode,
   addEdge,
   updateEdge,
@@ -15,8 +16,11 @@ import {
   enterSubdiagram,
   goBack,
   navigateTo,
+  jumpToDiagram,
   undo,
   redo,
+  removeMultiple,
+  pasteItems,
 } from './diagramStore';
 import { $history, clearHistory } from './historyStore';
 import { $selectedNodeId, $selectedEdgeId, selectNode } from './selectionStore';
@@ -245,5 +249,190 @@ describe('undo / redo', () => {
     const p = $project.get();
     undo();
     expect($project.get()).toBe(p);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// updateNodeSize
+// ---------------------------------------------------------------------------
+describe('updateNodeSize', () => {
+  it('updates node size without saving to history', () => {
+    createProject();
+    const node = addNode()!;
+    const historyBefore = $history.get().past.length;
+    updateNodeSize(node.id, 300, 150);
+    const diagram = $project.get()!.diagrams[$activeDiagramId.get()!];
+    expect(diagram.nodes.find((n) => n.id === node.id)!.size).toEqual({ width: 300, height: 150 });
+    expect($history.get().past.length).toBe(historyBefore);
+  });
+
+  it('is a no-op when no project is loaded', () => {
+    // $project is null — should not throw
+    expect(() => updateNodeSize('ghost', 100, 100)).not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// removeMultiple
+// ---------------------------------------------------------------------------
+describe('removeMultiple', () => {
+  it('removes multiple nodes in one history snapshot', () => {
+    createProject();
+    const n1 = addNode({ label: 'A' })!;
+    const n2 = addNode({ label: 'B' })!;
+    const n3 = addNode({ label: 'C' })!;
+    const historyBefore = $history.get().past.length;
+
+    removeMultiple([n1.id, n2.id], []);
+
+    const diagram = $project.get()!.diagrams[$activeDiagramId.get()!];
+    expect(diagram.nodes).toHaveLength(1);
+    expect(diagram.nodes[0].id).toBe(n3.id);
+    // Only one history snapshot for the batch operation
+    expect($history.get().past.length).toBe(historyBefore + 1);
+  });
+
+  it('removes multiple edges in one history snapshot', () => {
+    createProject();
+    const n1 = addNode()!;
+    const n2 = addNode()!;
+    const e1 = addEdge(n1.id, n2.id)!;
+    const e2 = addEdge(n2.id, n1.id)!;
+
+    removeMultiple([], [e1.id, e2.id]);
+
+    const diagram = $project.get()!.diagrams[$activeDiagramId.get()!];
+    expect(diagram.edges).toHaveLength(0);
+  });
+
+  it('is a no-op when both arrays are empty', () => {
+    createProject();
+    addNode();
+    const historyBefore = $history.get().past.length;
+    removeMultiple([], []);
+    expect($history.get().past.length).toBe(historyBefore);
+  });
+
+  it('is a no-op when no project is loaded', () => {
+    expect(() => removeMultiple(['n1'], [])).not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// pasteItems
+// ---------------------------------------------------------------------------
+describe('pasteItems', () => {
+  it('pastes nodes with offset positions and new IDs', () => {
+    createProject();
+    const original = addNode({ label: 'Original', x: 100, y: 100 })!;
+    const historyBefore = $history.get().past.length;
+
+    pasteItems([{ ...original }], [], 20, 30);
+
+    const diagram = $project.get()!.diagrams[$activeDiagramId.get()!];
+    expect(diagram.nodes).toHaveLength(2);
+
+    const pasted = diagram.nodes.find((n) => n.id !== original.id)!;
+    expect(pasted.label).toBe('Original');
+    expect(pasted.position).toEqual({ x: 120, y: 130 });
+    expect(pasted.id).not.toBe(original.id);
+    // One history snapshot
+    expect($history.get().past.length).toBe(historyBefore + 1);
+  });
+
+  it('does not clone childDiagramId when pasting', () => {
+    createProject();
+    const node = addNode()!;
+    enterSubdiagram(node.id);
+    goBack();
+
+    const project = $project.get()!;
+    const nodeWithChild = project.diagrams[$activeDiagramId.get()!].nodes.find((n) => n.id === node.id)!;
+    expect(nodeWithChild.childDiagramId).toBeTruthy();
+
+    pasteItems([nodeWithChild], [], 20, 20);
+
+    const diagram = $project.get()!.diagrams[$activeDiagramId.get()!];
+    const pasted = diagram.nodes.find((n) => n.id !== node.id)!;
+    expect(pasted.childDiagramId).toBeUndefined();
+  });
+
+  it('only includes edges where both endpoints are in the pasted set', () => {
+    createProject();
+    const n1 = addNode({ label: 'N1' })!;
+    const n2 = addNode({ label: 'N2' })!;
+    const n3 = addNode({ label: 'N3' })!;
+    const e_in = addEdge(n1.id, n2.id, undefined, undefined, 'In-selection')!;
+    const e_out = addEdge(n2.id, n3.id, undefined, undefined, 'Out-selection')!;
+
+    // Only paste n1 and n2, and both their edges — but e_out references n3 which is not pasted
+    pasteItems([n1, n2], [e_in, e_out], 50, 50);
+
+    const diagram = $project.get()!.diagrams[$activeDiagramId.get()!];
+    // Original 3 nodes + 2 pasted = 5 nodes
+    expect(diagram.nodes).toHaveLength(5);
+    // Original 2 edges + 1 pasted (only e_in remapped) = 3 edges
+    expect(diagram.edges).toHaveLength(3);
+
+    const pastedEdge = diagram.edges.find((e) => e.label === 'In-selection' && !e.id.includes(e_in.id));
+    expect(pastedEdge).toBeTruthy();
+  });
+
+  it('is a no-op when both arrays are empty', () => {
+    createProject();
+    addNode();
+    const historyBefore = $history.get().past.length;
+    pasteItems([], []);
+    expect($history.get().past.length).toBe(historyBefore);
+  });
+
+  it('is a no-op when no project is loaded', () => {
+    expect(() => pasteItems([{ id: 'n1', type: 'System', label: 'X', position: { x: 0, y: 0 }, size: { width: 100, height: 50 } }], [])).not.toThrow();
+  });
+
+  it('generates unique IDs for each pasted node', () => {
+    createProject();
+    const node = addNode()!;
+    pasteItems([node], [], 10, 10);
+    pasteItems([node], [], 20, 20);
+
+    const diagram = $project.get()!.diagrams[$activeDiagramId.get()!];
+    const ids = diagram.nodes.map((n) => n.id);
+    expect(new Set(ids).size).toBe(ids.length); // all unique
+  });
+});
+
+// ---------------------------------------------------------------------------
+// jumpToDiagram
+// ---------------------------------------------------------------------------
+describe('jumpToDiagram', () => {
+  it('navigates directly to a nested diagram and rebuilds the stack', () => {
+    createProject();
+    const node = addNode()!;
+    const rootId = $activeDiagramId.get()!;
+
+    enterSubdiagram(node.id);
+    const subDiagId = $activeDiagramId.get()!;
+
+    // Jump back to root via jumpToDiagram
+    jumpToDiagram(rootId);
+    expect($activeDiagramId.get()).toBe(rootId);
+    expect($navigationStack.get()).toEqual([rootId]);
+
+    // Jump back to sub-diagram directly
+    jumpToDiagram(subDiagId);
+    expect($activeDiagramId.get()).toBe(subDiagId);
+    expect($navigationStack.get()).toEqual([rootId, subDiagId]);
+  });
+
+  it('is a no-op when diagram does not exist in project', () => {
+    createProject();
+    const rootId = $activeDiagramId.get()!;
+    jumpToDiagram('nonexistent-diag');
+    expect($activeDiagramId.get()).toBe(rootId);
+  });
+
+  it('is a no-op when no project is loaded', () => {
+    expect(() => jumpToDiagram('any')).not.toThrow();
   });
 });
