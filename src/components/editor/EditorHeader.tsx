@@ -38,7 +38,12 @@ function downloadFile(name: string, content: string, mime: string): void {
 // ---------------------------------------------------------------------------
 
 function isMac(): boolean {
-  return typeof navigator !== 'undefined' && /mac/i.test(navigator.platform);
+  if (typeof navigator === 'undefined') return false;
+  // navigator.userAgentData is available in Chromium-based browsers (Chrome, Edge)
+  const platform =
+    (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform ??
+    navigator.platform;
+  return /mac/i.test(platform);
 }
 
 function shortcut(key: string): string {
