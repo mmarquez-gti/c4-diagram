@@ -108,17 +108,6 @@ function getContrastTextColor(bgHex: string): string {
   }
 }
 
-function isUserTypingInField(): boolean {
-  const activeElement = document.activeElement as HTMLElement | null;
-  if (!activeElement) return false;
-  return (
-    activeElement.tagName === 'INPUT' ||
-    activeElement.tagName === 'TEXTAREA' ||
-    activeElement.tagName === 'SELECT' ||
-    activeElement.isContentEditable
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Conversion helpers
 // ---------------------------------------------------------------------------
@@ -156,7 +145,6 @@ function toFlowNode(n: C4NodeData, selectedId: string | null, darkMode: boolean)
 
   return {
     id: n.id,
-    selected: isSelected,
     position: n.position,
     width: n.size.width,
     height: n.size.height,
@@ -207,7 +195,6 @@ function toFlowEdge(
 
   return {
     id: e.id,
-    selected: isSelected,
     type: 'custom',
     source: e.source,
     target: e.target,
@@ -236,8 +223,26 @@ function toFlowEdge(
   };
 }
 
-// ---------------------------------------------------------------------------
-// Inner component: re-fits the view whenever the active diagram changes
+/** Rebuild a node array for a new diagram snapshot while preserving ReactFlow's
+ * current selection state (the `selected` flag and `data.isSelected`).
+ * Called from effects that replace all nodes wholesale (project rebuild,
+ * darkMode theme swap) so that the Properties panel stays open while typing. */
+function mergeNodeSelection(
+  c4Nodes: C4NodeData[],
+  existingNodes: Node[],
+  darkMode: boolean,
+): Node[] {
+  const selSet = new Set(existingNodes.filter((n) => n.selected).map((n) => n.id));
+  return c4Nodes.map((n) => {
+    const isSelected = selSet.has(n.id);
+    // Pass the node's own id as selectedId only when it's currently selected so
+    // that toFlowNode sets data.isSelected=true for visual highlighting.
+    const node = toFlowNode(n, isSelected ? n.id : null, darkMode);
+    return isSelected ? { ...node, selected: true } : node;
+  });
+}
+
+
 // ---------------------------------------------------------------------------
 
 function FitViewOnDiagramChange({ activeDiagramId }: { activeDiagramId: string | null }) {
@@ -392,12 +397,22 @@ export default function DiagramCanvas() {
       return;
     }
     const d = getActiveDiagram();
-    setNodes((d?.nodes ?? []).map((n) => toFlowNode(n, selectedNodeId, darkMode)));
-    setEdges((d?.edges ?? []).map((e) => {
-      const flowEdge = toFlowEdge(e, selectedEdgeId, edgeColor, edgeCallbacks);
-      flowEdge.reconnectable = selectedEdgeId === e.id || reconnectingEdgeId === e.id;
-      return flowEdge;
-    }));
+    const c4Nodes = d?.nodes ?? [];
+    const c4Edges = d?.edges ?? [];
+    // Use the updater form so we can read the current ReactFlow selection state
+    // and carry it into the rebuilt arrays. Without this, calling setNodes with a
+    // brand-new array clears ReactFlow's internal selection, which fires
+    // onSelectionChange({nodes:[]}) and closes the Properties panel while typing.
+    setNodes((existingNodes) => mergeNodeSelection(c4Nodes, existingNodes, darkMode));
+    setEdges((existingEdges) => {
+      const selSet = new Set(existingEdges.filter((e) => e.selected).map((e) => e.id));
+      return c4Edges.map((e) => {
+        const isSelected = selSet.has(e.id);
+        const fe = toFlowEdge(e, isSelected ? e.id : null, edgeColor, edgeCallbacks);
+        fe.reconnectable = isSelected || reconnectingEdgeId === e.id;
+        return isSelected ? { ...fe, selected: true } : fe;
+      });
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project]);
 
@@ -420,7 +435,8 @@ export default function DiagramCanvas() {
       }),
     );
     const d = getActiveDiagram();
-    setNodes((d?.nodes ?? []).map((n) => toFlowNode(n, selectedNodeId, darkMode)));
+    // Use the updater form to preserve ReactFlow's selection state across theme changes.
+    setNodes((existingNodes) => mergeNodeSelection(d?.nodes ?? [], existingNodes, darkMode));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [darkMode]);
 
@@ -429,7 +445,6 @@ export default function DiagramCanvas() {
     setNodes((nds) =>
       nds.map((n) => ({
         ...n,
-        selected: selectedNodeId === n.id,
         data: {
           ...n.data,
           isSelected: selectedNodeId === n.id,
@@ -448,7 +463,6 @@ export default function DiagramCanvas() {
 
         return {
           ...e,
-          selected: selectedEdgeId === e.id,
           style: {
             ...e.style,
             stroke: strokeColor,
@@ -584,13 +598,11 @@ export default function DiagramCanvas() {
       if (nodeIds.length > 1 || edgeIds.length > 1 || (nodeIds.length > 0 && edgeIds.length > 0)) {
         clearSelection();
       } else if (nodeIds.length === 0 && edgeIds.length === 0) {
-        if (!(isUserTypingInField() && (selectedNodeId || selectedEdgeId))) {
-          clearSelection();
-        }
+        clearSelection();
       }
       // Single-item selection is handled by handleNodeClick / handleEdgeClick.
     },
-    [selectedEdgeId, selectedNodeId],
+    [],
   );
 
   // Selection
