@@ -108,6 +108,17 @@ function getContrastTextColor(bgHex: string): string {
   }
 }
 
+function isUserTypingInField(): boolean {
+  const activeElement = document.activeElement as HTMLElement | null;
+  if (!activeElement) return false;
+  return (
+    activeElement.tagName === 'INPUT' ||
+    activeElement.tagName === 'TEXTAREA' ||
+    activeElement.tagName === 'SELECT' ||
+    activeElement.isContentEditable
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Conversion helpers
 // ---------------------------------------------------------------------------
@@ -573,14 +584,7 @@ export default function DiagramCanvas() {
       if (nodeIds.length > 1 || edgeIds.length > 1 || (nodeIds.length > 0 && edgeIds.length > 0)) {
         clearSelection();
       } else if (nodeIds.length === 0 && edgeIds.length === 0) {
-        const activeElement = document.activeElement as HTMLElement | null;
-        const isTypingInField = !!activeElement && (
-          activeElement.tagName === 'INPUT' ||
-          activeElement.tagName === 'TEXTAREA' ||
-          activeElement.tagName === 'SELECT' ||
-          activeElement.isContentEditable
-        );
-        if (isTypingInField && (selectedNodeId || selectedEdgeId)) return;
+        if (isUserTypingInField() && (selectedNodeId || selectedEdgeId)) return;
         clearSelection();
       }
       // Single-item selection is handled by handleNodeClick / handleEdgeClick.
