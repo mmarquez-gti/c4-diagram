@@ -145,6 +145,7 @@ function toFlowNode(n: C4NodeData, selectedId: string | null, darkMode: boolean)
 
   return {
     id: n.id,
+    selected: isSelected,
     position: n.position,
     width: n.size.width,
     height: n.size.height,
@@ -195,6 +196,7 @@ function toFlowEdge(
 
   return {
     id: e.id,
+    selected: isSelected,
     type: 'custom',
     source: e.source,
     target: e.target,
@@ -416,6 +418,7 @@ export default function DiagramCanvas() {
     setNodes((nds) =>
       nds.map((n) => ({
         ...n,
+        selected: selectedNodeId === n.id,
         data: {
           ...n.data,
           isSelected: selectedNodeId === n.id,
@@ -434,6 +437,7 @@ export default function DiagramCanvas() {
 
         return {
           ...e,
+          selected: selectedEdgeId === e.id,
           style: {
             ...e.style,
             stroke: strokeColor,
@@ -569,11 +573,19 @@ export default function DiagramCanvas() {
       if (nodeIds.length > 1 || edgeIds.length > 1 || (nodeIds.length > 0 && edgeIds.length > 0)) {
         clearSelection();
       } else if (nodeIds.length === 0 && edgeIds.length === 0) {
+        const active = document.activeElement as HTMLElement | null;
+        const isTypingInField = !!active && (
+          active.tagName === 'INPUT' ||
+          active.tagName === 'TEXTAREA' ||
+          active.tagName === 'SELECT' ||
+          active.isContentEditable
+        );
+        if (isTypingInField && (selectedNodeId || selectedEdgeId)) return;
         clearSelection();
       }
       // Single-item selection is handled by handleNodeClick / handleEdgeClick.
     },
-    [],
+    [selectedEdgeId, selectedNodeId],
   );
 
   // Selection
