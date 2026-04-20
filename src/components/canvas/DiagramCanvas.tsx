@@ -584,8 +584,9 @@ export default function DiagramCanvas() {
       if (nodeIds.length > 1 || edgeIds.length > 1 || (nodeIds.length > 0 && edgeIds.length > 0)) {
         clearSelection();
       } else if (nodeIds.length === 0 && edgeIds.length === 0) {
-        if (isUserTypingInField() && (selectedNodeId || selectedEdgeId)) return;
-        clearSelection();
+        if (!(isUserTypingInField() && (selectedNodeId || selectedEdgeId))) {
+          clearSelection();
+        }
       }
       // Single-item selection is handled by handleNodeClick / handleEdgeClick.
     },
