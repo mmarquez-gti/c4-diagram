@@ -573,12 +573,12 @@ export default function DiagramCanvas() {
       if (nodeIds.length > 1 || edgeIds.length > 1 || (nodeIds.length > 0 && edgeIds.length > 0)) {
         clearSelection();
       } else if (nodeIds.length === 0 && edgeIds.length === 0) {
-        const active = document.activeElement as HTMLElement | null;
-        const isTypingInField = !!active && (
-          active.tagName === 'INPUT' ||
-          active.tagName === 'TEXTAREA' ||
-          active.tagName === 'SELECT' ||
-          active.isContentEditable
+        const activeElement = document.activeElement as HTMLElement | null;
+        const isTypingInField = !!activeElement && (
+          activeElement.tagName === 'INPUT' ||
+          activeElement.tagName === 'TEXTAREA' ||
+          activeElement.tagName === 'SELECT' ||
+          activeElement.isContentEditable
         );
         if (isTypingInField && (selectedNodeId || selectedEdgeId)) return;
         clearSelection();
